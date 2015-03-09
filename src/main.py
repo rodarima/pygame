@@ -5,8 +5,8 @@ from pygame import gfxdraw
 
 class Recording():
 	""" Records events for auto-play """
-	def __init__(self):
-		self.start_time = time.perf_counter()
+	def __init__(self, t):
+		self.start_time = t
 		self.events = []
 		self.last_get = 0.0
 		self.play_offset = 0.0
@@ -98,8 +98,14 @@ class SpriteT(pygame.sprite.Sprite):
 	def load_image(self, f):
 		img = pygame.image.load(f)
 		img = img.convert()
-		#img.set_colorkey(img.get_at((0,0)), pygame.RLEACCEL)
+		img.set_colorkey(img.get_at((0,0)), pygame.RLEACCEL)
 		return img
+	
+	def update(self, t):
+		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
+		r = self.rect
+		r.bottomleft = scr_pos
+		screen.blit(self.surf, r)
 
 class BlockState():
 
@@ -145,7 +151,7 @@ class Boy(SpriteT):
 	def event(self, e, from_obj):
 		if(from_obj != None): return False
 		if(self.disabled): return False
-		print('Boy'+str(self.i)+' event '+ str(e) +' from ' +str(from_obj))
+		#print('Boy'+str(self.i)+' event '+ str(e) +' from ' +str(from_obj))
 		if e.type == pygame.KEYDOWN:
 			if e.key == pygame.K_LEFT: self.vx = -1
 			elif e.key == pygame.K_RIGHT: self.vx = 1
@@ -167,9 +173,9 @@ class Boy(SpriteT):
 		#pyy = h-cy
 		pos = self.cam.get_screen_position(0,0)
 		pygame.draw.line(pygame.display.get_surface(),
-			(255,0,0), (pos[0], 0), (pos[0], h), 1)
+			(50,0,0), (pos[0], 0), (pos[0], h), 1)
 		pygame.draw.line(pygame.display.get_surface(),
-			(255,0,0), (0, pos[1]), (w, pos[1]), 1)
+			(50,0,0), (0, pos[1]), (w, pos[1]), 1)
 		
 
 	def update(self, t):
@@ -178,23 +184,26 @@ class Boy(SpriteT):
 		self.update_position(t * self.fps)
 		self.frame(self.vx)
 		self.cam.update()
-		#w, h = screen.get_size()
-		abs_pos = (self.rx, self.ry)
-		rel_pos = self.cam.get_relative_position(self.rx, self.ry)
-		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
-		#print('Boy rect: ' + str(self.rect))
-		
-		print('Boy absolute position ' + str(abs_pos))
-		print('Boy relative position ' + str(rel_pos))
-		print('Boy screen position ' + str(scr_pos))
-
 		self._draw_axis()
-		
-		r = self.rect
-		#r.left += cx
-		#r.bottom += cy
-		r.bottomleft = scr_pos
-		screen.blit(self.surf, r)
+
+		SpriteT.update(self, t)
+		##w, h = screen.get_size()
+		#abs_pos = (self.rx, self.ry)
+		#rel_pos = self.cam.get_relative_position(self.rx, self.ry)
+		#scr_pos = self.cam.get_screen_position(self.rx, self.ry)
+		##print('Boy rect: ' + str(self.rect))
+		#
+		#print('Boy absolute position ' + str(abs_pos))
+		#print('Boy relative position ' + str(rel_pos))
+		#print('Boy screen position ' + str(scr_pos))
+
+		#self._draw_axis()
+		#
+		#r = self.rect
+		##r.left += cx
+		##r.bottom += cy
+		#r.bottomleft = scr_pos
+		#screen.blit(self.surf, r)
 		#print("x:"+str(self.rx)+" y:"+str(self.ry))
 
 	def disable(self):
@@ -221,8 +230,8 @@ class Machine(SpriteT, BlockState):
 		self.img_frames = 4
 		self.img_frame = 0
 		self.state = MACHINE_OFF
-		self.timer_time = 10.0
-		self.timer_step = 0.5
+		self.timer_time = 10.0 * 30
+		self.timer_step = 0.5 * 30
 		self.timer_start = 0.0
 		self.action = 0
 		self.rect = pygame.Rect((0,0), (self.imgw, self.imgh))
@@ -244,16 +253,17 @@ class Machine(SpriteT, BlockState):
 #				self.action = 1
 	
 	def event(self, e, from_obj):
-		print('Machine event from ' + str(from_obj.i))
+		#print('Machine event from ' + str(from_obj.i))
 		if not ((e.type == pygame.KEYDOWN) and (e.key == pygame.K_SPACE)):
 			return False
 		if(self.blocked() == False):
+			print('Machine blocking from ' + str(from_obj.i))
 			self.block(from_obj.i)
 			if self.state == MACHINE_OFF:
 				self.action = 1
 				return True
 		elif self.is_blocked_by(from_obj.i):
-			print('Unblocking machine from ' + str(from_obj.i))
+			print('Machine unblocking from ' + str(from_obj.i))
 			self.unblock()
 			self.poweroff()
 			return True
@@ -276,6 +286,9 @@ class Machine(SpriteT, BlockState):
 
 	def poweron(self):
 		self.state = MACHINE_ON
+		#Crear un evento de encendido
+		pygame.event.Event()
+		eventd.event()
 		print("Machine powered on")
 
 	def poweroff(self):
@@ -290,16 +303,17 @@ class Machine(SpriteT, BlockState):
 		if(self.state in (MACHINE_TIMER0, MACHINE_TIMER1)):
 			self.update_timer(t)
 		self.frame()
-		print('Machine rect: ' + str(self.rect))
+		#print('Machine rect: ' + str(self.rect))
 		if self.blocked():
-			pygame.draw.rect(self.surf, (255,0,0), (0, 0,
+			pygame.draw.rect(self.surf, (100,0,0), (0, 0,
 				self.imgw, self.imgh), 1)
 
-		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
+		#scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		#rect = pygame.Rect(self.rx + cx, self.ry + cy, self.imgw, self.imgh)
-		r = self.rect
-		r.bottomleft = scr_pos
-		screen.blit(self.surf, r)
+		#r = self.rect
+		#r.bottomleft = scr_pos
+		#screen.blit(self.surf, r)
+		SpriteT.update(self, t)
 
 class Event:
 	def __init__(self, position, e):
@@ -355,9 +369,6 @@ class EventDaemon:
 		self.eventlist = []
 		return l
 
-	def set_active_boy(self, boy):
-		self.active_boy = boy
-
 	def _dispatch_keyboard(self):
 		if(self.active_boy == None): return
 		
@@ -373,7 +384,7 @@ class EventDaemon:
 			from_obj = elem[1]
 			l = self.object_manager.collide(from_obj)
 			for obj in l:
-				print('Sending event to:' + str(obj))
+				#print('Sending event to:' + str(obj))
 				if obj.event(e, from_obj) == True: break
 
 class ObjectManager:
@@ -392,6 +403,7 @@ class ObjectManager:
 
 	def update(self, t):
 		#TODO: Actualizar primero el personaje activo
+		
 		for obj in self.objects:
 			#print('Updating object: ' + str(obj))
 			obj.update(t)
@@ -423,7 +435,7 @@ class Camera:
 		cy = hm - ry - hb/2
 
 		self.camera = (int(cx), int(cy))
-		print('Camera update '+str(self.camera))
+		#print('Camera update '+str(self.camera))
 
 
 	def get_relative_position(self, rx, ry):
@@ -433,9 +445,39 @@ class Camera:
 		w, h = screen.get_size()
 		return (rx+self.camera[0], h-(ry+self.camera[1]))
 
+# SVT = Sistema de viajes temporales
+class SVT:
+	def __init__(self, om, eventd):
+		self.recordlist = []
+		self.clonelist = []
+		self.om = om
+		self.eventd = eventd
+
+	def on(self, machine, t):
+		rec = Recording(t)
+		active_boy = eventd.active_boy
+		clone = om.clone()
+		item = (machine, active_boy, rec, clone)
+		self.recordlist.append(item)
+
+	def event(self, active_boy)
 
 pygame.init()
 screen = pygame.display.set_mode((320, 240))
+
+def level1(t, eventd, camera, om):
+	m0 = Machine(t, eventd, camera)
+	m0.set_position(50, 0)
+	om.add(m0)
+
+	#floor0 = Sprite
+	
+	b0 = Boy(t, eventd, camera)
+	b0.set_position(0, 0)
+	om.add(b0)
+
+	camera.follow(b0)
+	eventd.active_boy = b0
 
 def main():
 	#t = time.perf_counter()
@@ -446,17 +488,8 @@ def main():
 	eventctrl = EventControl(t)
 	eventd = EventDaemon(eventctrl, om)
 	camera = Camera()
-	
-	m0 = Machine(t, eventd, camera)
-	m0.set_position(50, 0)
-	om.add(m0)
-	
-	b0 = Boy(t, eventd, camera)
-	b0.set_position(0, 0)
-	om.add(b0)
 
-	camera.follow(b0)
-	eventd.set_active_boy(b0)
+	level1(t, eventd, camera, om)
 
 	while True:
 		#print("-- Loop start --")
@@ -464,7 +497,7 @@ def main():
 		#t = time.perf_counter()
 		t = frame
 		
-		screen.fill((100, 100, 100))
+		screen.fill((0, 0, 0))
 		eventd.dispatch(t)
 		om.update(t)
 		pygame.display.update()
