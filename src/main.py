@@ -9,7 +9,7 @@ REC_STOPPED = 2
 
 class Recording():
 	""" Records events for auto-play """
-	def __init__(self, t):
+	def __init__(self, t, svt):
 		self.start_time = t
 		self.end_time = 0
 		self.events = []
@@ -18,6 +18,7 @@ class Recording():
 		self.play_end = 0
 		self.play_offset = 0.0
 		self.state = REC_RECORDING
+		self.svt = svt
 
 	def event(self, e):
 		if(self.state != REC_RECORDING): return
@@ -58,6 +59,11 @@ class Recording():
 		start_get = self.last_start
 		end_get = self.play_start + (t - self.play_end)
 		self.last_start = end_get
+
+		# Al terminar la grabación, detenerse y avisar a SVT
+		if start_get > self.end_time:
+			self.state = REC_STOPPED
+			self.svt.end_record(self)
 #		print("start:"+str(start_get))
 #		print("end:"+str(end_get))
 
@@ -129,8 +135,8 @@ class SpriteT(pygame.sprite.Sprite):
 		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		self.rect.bottomleft = scr_pos
 
-		label = terminus.render(str((self.rx, self.ry, self.last_time, t)), 1, (255,0,0))
-		screen.blit(label, scr_pos)
+		#label = terminus.render(str((self.rx, self.ry, self.last_time, t)), 1, (255,0,0))
+		#screen.blit(label, scr_pos)
 
 		screen.blit(self.surf, self.rect)
 	
@@ -181,7 +187,7 @@ class Boy(SpriteT):
 		self.fps = 1
 		#self.rx = 106
 		#self.ry = 110
-		#self.disabled = False
+		self.disabled = False
 		self.i = -1
 		self.cam = cam
 		self.rect = pygame.Rect((0,0), (13, 21))
@@ -204,7 +210,7 @@ class Boy(SpriteT):
 
 	def event(self, e, t, from_obj):
 		if(from_obj != None): return False
-		#if(self.disabled): return False
+		if(self.disabled): return False
 		#print('Boy'+str(self.i)+' event '+ str(e) +' from '
 		#	+str(from_obj) + ' at ' + str(t))
 		if e.type == pygame.KEYDOWN:
@@ -236,23 +242,25 @@ class Boy(SpriteT):
 	def clone(self):
 		d = {}
 		d['fr'] = self.fr
+		d['disabled'] = self.disabled
 		#d['BlockState'] = BlockState.clone(self)
 		d['SpriteT'] = SpriteT.clone(self)
 		return d
 
 	def restore(self, d):
 		self.fr = d['fr']
+		self.disabled = d['disabled']
 		#BlockState.restore(self, d['BlockState'])
 		SpriteT.restore(self, d['SpriteT'])
 		
 
 	def update(self, t):
-		#if(self.disabled): return
+		if(self.disabled): return
 		#print('Boy update')
 		self.update_position(t)
 		self.frame(self.vx)
 		self.cam.update()
-		self._draw_axis()
+		#self._draw_axis()
 
 		SpriteT.update(self, t)
 		##w, h = screen.get_size()
@@ -274,10 +282,10 @@ class Boy(SpriteT):
 		#screen.blit(self.surf, r)
 		#print("x:"+str(self.rx)+" y:"+str(self.ry))
 
-	#def disable(self):
-	#	self.disabled = True
-	#def enable(self):
-	#	self.disabled = False
+	def disable(self):
+		self.disabled = True
+	def enable(self):
+		self.disabled = False
 
 MACHINE_OFF = 0
 MACHINE_TIMER0 = 1
@@ -376,9 +384,9 @@ class Machine(SpriteT, BlockState):
 			self.update_timer(t)
 		self.frame()
 		#print('Machine rect: ' + str(self.rect))
-		if self.blocked():
-			pygame.draw.rect(self.surf, (100,0,0), (0, 0,
-				self.imgw, self.imgh), 1)
+		#if self.blocked():
+		#	pygame.draw.rect(self.surf, (100,0,0), (0, 0,
+		#		self.imgw, self.imgh), 1)
 
 		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		abs_pos = (self.rx, self.ry)
@@ -588,6 +596,10 @@ class SVT:
 		for t in self.recordlist:
 			if t[0] == boy:
 				return t
+	def find_rec(self, rec):
+		for t in self.recordlist:
+			if t[1] == rec:
+				return t
 
 	def on(self, machine, t):
 		clone = self.om.clone()
@@ -634,7 +646,7 @@ class SVT:
 		if self.eventd.active_boy == None: return
 		if boy.i != self.eventd.active_boy.i: return
 
-		rec = Recording(t)
+		rec = Recording(t, self)
 		rec.new_frame(t)
 		self.recordlist.append((boy, rec))
 		#print(self.recordlist)
@@ -652,6 +664,12 @@ class SVT:
 		'Envía los eventos del teclado a las grabaciones'
 		for tup in self.recordlist:
 			eventl = tup[1].event(e)
+
+	def end_record(self, rec):
+		'Al terminar una grabación, quitar al personaje'
+		tup = self.find_rec(rec)
+		boy = tup[0]
+		boy.disable()
 		
 		
 
@@ -707,102 +725,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
-#pygame.init()
-#
-#size = width, height = 320, 240
-#speed = [2, 2]
-#black = 0, 0, 0
-#n = False
-#
-#screen = pygame.display.set_mode(size)
-#
-##boy = pygame.image.load("../img/boy2.gif")
-##boy.set_colorkey((0,0,0))
-##boy = boy.subsurface(0, 0, 13, 21)
-##x = 30
-##y = 30
-##dx = 0
-##dy = 0
-#fr = 0
-#boy = Boy(fr)
-#machine = Machine(fr)
-#use_record = False
-#
-#clock = pygame.time.Clock()
-#recording = Recording()
-#saved_pos = (0,0)
-#saved_vel = (0,0)
-#saved_time = 0
-#saved = False
-#
-#eventd = EventDaemon
-#
-#while 1:
-#	t = time.perf_counter()
-#	
-#	
-#
-#	if use_record:
-#		for event in recording.get():
-#			if event.type == pygame.KEYDOWN:
-#				if(event.key == pygame.K_e):
-#					if(pygame.sprite.collide_rect(boy1, machine)):
-#						machine.event()
-#			boy1.event(event)
-#	else: recording.new_frame()
-#	
-#	for event in pygame.event.get():
-#		if event.type == pygame.QUIT:
-#			sys.exit()
-#		elif event.type == pygame.KEYDOWN:
-#			if(not use_record and event.key != pygame.K_SPACE):
-#				recording.event(event)
-#			if(event.key == pygame.K_e):
-#				if(pygame.sprite.collide_rect(boy, machine)):
-#					machine.event()
-#		elif event.type == pygame.KEYUP:
-#			if(not use_record and event.key != pygame.K_SPACE):
-#				recording.event(event)
-#			if(not use_record and event.key == pygame.K_SPACE):
-#				recording.print()
-#				use_record = True
-#				recording.play(saved_time)
-#				boy.set_position(106,110)
-#				boy.set_velocity(0,0)
-#				machine.state = MACHINE_OFF
-#				boy1 = Boy(t)
-#				boy1.rx = saved_pos[0]
-#				boy1.ry = saved_pos[1]
-#				# TODO: Reparar velocidad al aparecer de nuevo
-#				#boy1.vx = saved_vel[0]
-#				#boy1.vy = saved_vel[1]
-#				#boy.disable()
-#		boy.event(event)
-#
-#	screen.fill((0,0,0))
-#
-#	#floor1 = pygame.Surface((200, 1))
-#	#pygame.draw.line(floor1, (255,255,255), (0, 0), (200, 0), 1)
-#	#screen.blit(floor1, (0, 50, 200, 1))
-#	if use_record:
-#		boy1.update(t)
-#		#if machine.state == MACHINE_ON:
-#		#	boy.enable()
-#	elif machine.state == MACHINE_ON and not saved:
-#		print("Time saved:" + str(t))
-#		saved = True
-#		saved_pos = (boy.rx, boy.ry)
-#		saved_vel = (boy.vx, boy.vy)
-#		saved_time = t
-#	boy.update(t)
-#	#boy.update(fr)
-#	machine.update(t)
-#	pygame.display.update()
-#	pygame.display.flip()
-#
-#	clock.tick(30)
-#	fr += 1
-#
-
 
