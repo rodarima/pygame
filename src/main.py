@@ -3,6 +3,7 @@ import pyganim
 from pympler import asizeof
 from pygame import gfxdraw
 
+FPS = 60
 REC_RECORDING = 0
 REC_WAITING = 1
 REC_PLAYING = 2
@@ -191,13 +192,76 @@ class BlockState():
 		self.obj_block = d['block']
 
 
-class Boy(SpriteT):
-	def __init__(self, t, eventd, cam, svt):
+class Wall(pygame.sprite.Sprite):
+	def __init__(self, pos, size, cam):
+		pygame.sprite.Sprite.__init__(self);
+		self.pos = pos
+		self.rx = pos[0]
+		self.ry = pos[1]
+		self.size = size
+		self.surf = pygame.Surface(size)
+		self.surf.fill((100,100,100))
+		self.cam = cam
+		self.rect = pygame.Rect((0,0),(size))
+		
+		scr_pos = self.cam.get_screen_position(self.pos[0], self.pos[1])
+		self.rect.bottomleft = scr_pos
+
+	def update(self, rel_t):
+		scr_pos = self.cam.get_screen_position(self.pos[0], self.pos[1])
+		self.rect.bottomleft = scr_pos
+		screen.blit(self.surf, self.rect)
+
+	#def clone(self): return None
+	#def restore(self, d): pass
+
+class Gravity:
+	def __init__(self, om):
+		self.k = 0.001
+		self.g = -9.81 * self.k
+		self.om = om
+		self.falling = False
+		self.falling_start = 0
+
+	def update_velocity(self, rel_t):
+		max_y = self.om.collide_walls(self)
+		if max_y == None:
+			if not self.falling:
+				print('Falling')
+				self.falling = True
+				self.falling_start = rel_t
+			else:
+				falling_time = rel_t - self.falling_start
+				self.vy += falling_time * self.g
+			#print('Falling vy = '+str(self.vy))
+		elif self.falling:
+			print('Stop falling max_y = ' + str(max_y))
+			self.falling = False
+			self.vy = 0
+			
+			self.ry = max_y
+	
+	def clone(self):
+		d = {}
+		d['falling'] = self.falling
+		d['falling_start'] = self.falling_start
+		return d
+
+	def restore(self, d):
+		self.falling = d['falling']
+		self.falling_start = d['falling_start']
+
+KEY_JUMP = pygame.K_UP
+KEY_ACTION = pygame.K_SPACE
+
+class Boy(SpriteT, Gravity):
+	def __init__(self, t, eventd, cam, svt, om):
 		SpriteT.__init__(self, t)
+		Gravity.__init__(self, om)
 		self.img = self.load_image("../img/boy2.gif")
 		self.eventd = eventd
 		self.fr = 0.0
-		self.fps = 1
+		#self.fps = 1
 		#self.rx = 106
 		#self.ry = 110
 		self.disabled = False
@@ -238,16 +302,16 @@ class Boy(SpriteT):
 		if e.type == pygame.KEYDOWN:
 			if e.key == pygame.K_LEFT: self.vx = -1
 			elif e.key == pygame.K_RIGHT: self.vx = 1
-			elif e.key == pygame.K_DOWN: self.vy = -1
-			elif e.key == pygame.K_UP: self.vy = 1
-			elif e.key == pygame.K_SPACE: self.eventd.event(e, self)
+			#elif e.key == pygame.K_DOWN: self.vy = -1
+			elif e.key == KEY_JUMP: self.vy = 2
+			elif e.key == KEY_ACTION: self.eventd.event(e, self)
 		elif e.type == pygame.KEYUP:
 			if e.key == pygame.K_LEFT: self.vx = 0
 			elif e.key == pygame.K_RIGHT: self.vx = 0
-			elif e.key == pygame.K_DOWN: self.vy = 0
-			elif e.key == pygame.K_UP: self.vy = 0
-			elif e.key == pygame.K_SPACE: self.eventd.event(e, self)
-		self.update_position(t)
+			#elif e.key == pygame.K_DOWN: self.vy = 0
+			#elif e.key == KEY_JUMP: self.vy = 0
+			elif e.key == KEY_ACTION: self.eventd.event(e, self)
+		#self.update_position(t)
 		return True
 
 	def _draw_axis(self):
@@ -268,6 +332,7 @@ class Boy(SpriteT):
 		d['flipped'] = self.flipped
 		#d['BlockState'] = BlockState.clone(self)
 		d['SpriteT'] = SpriteT.clone(self)
+		d['Gravity'] = Gravity.clone(self)
 		return d
 
 	def restore(self, d):
@@ -276,11 +341,13 @@ class Boy(SpriteT):
 		self.flipped = d['flipped']
 		#BlockState.restore(self, d['BlockState'])
 		SpriteT.restore(self, d['SpriteT'])
+		Gravity.restore(self, d['Gravity'])
 		
 
 	def update(self, t):
 		if(self.disabled): return
 		#print('Boy update')
+		Gravity.update_velocity(self, t)
 		self.update_position(t)
 		self.frame(abs(self.vx))
 		self.cam.update()
@@ -333,8 +400,8 @@ class Machine(SpriteT, BlockState):
 		self.img_frames = 4
 		self.img_frame = 0
 		self.state = MACHINE_OFF
-		self.timer_time = 2.0 * 60
-		self.timer_step = 0.2 * 60
+		self.timer_time = 1.0 * FPS
+		self.timer_step = 0.2 * FPS
 		self.timer_start = 0.0
 		self.action = 0
 		self.rect = pygame.Rect((0,0), (self.imgw, self.imgh))
@@ -537,6 +604,7 @@ class ObjectManager:
 	def __init__(self):
 		self.objects = [] #pygame.sprite.Group()
 		self.i = 0
+		self.walls = [] #pygame.sprite.Group()
 
 	def add(self, obj):
 		obj.i = self.i
@@ -551,7 +619,7 @@ class ObjectManager:
 	def update(self, rel_t):
 		#TODO: Actualizar primero el personaje activo
 		
-		for obj in self.objects:
+		for obj in self.objects+self.walls:
 			#print('Updating object: ' + str(obj))
 			obj.update(rel_t)
 
@@ -565,6 +633,20 @@ class ObjectManager:
 		for t in d['l']:
 			if t[0] == boy:
 				t[0].restore(t[1])
+
+	def add_wall(self, obj):
+		self.walls.append(obj)
+
+	def collide_walls(self, obj):
+		l = pygame.sprite.spritecollide(obj, self.walls, False)
+		if l != []:
+			max_y = l[0].ry
+			for o in l:
+				if o.ry > max_y: max_y = o.ry
+			#print(str(l))
+			return max_y
+		else:
+			return None
 
 	def clone(self):
 		d = {}
@@ -670,6 +752,10 @@ class SVT:
 		for t in self.recordlist:
 			t[1].play(rel_t)
 
+	def print_time(self, rel_t):
+		label = font_time.render('Time: ' + str(int(rel_t/FPS)), 1, (100,100,100))
+		screen.blit(label, (300, 10))
+
 	def enable_machines(self, m):
 		'Activa todas las máquinas excepto la actual'
 	
@@ -703,7 +789,7 @@ class SVT:
 
 		#print('Rel_t ' + str(rel_t) + ' restaurando ' + str(tm[1]))
 		
-		b = Boy(start, self.eventd, self.cam, self)
+		b = Boy(start, self.eventd, self.cam, self, self.om)
 		# TODO: Ajustar esta posicion para que quede en el centro
 		b.set_position(machine.rx, machine.ry)
 		self.om.add(b)
@@ -730,6 +816,7 @@ class SVT:
 		rel_t = self.rel(abs_t)
 		self.dispatch(rel_t)
 		self.om.update(rel_t)
+		self.print_time(rel_t)
 
 	def dispatch(self, rel_t):
 		'Envía los eventos de las grabaciones a los personajes'
@@ -766,6 +853,9 @@ class SVT:
 class Game:
 
 	def level1(self, t, eventd, camera, om, svt):
+		w0 = Wall((-50, 0), (400, 1), camera)
+		om.add_wall(w0)
+
 		m0 = Machine(t, eventd, camera, svt)
 		m0.set_position(100, 0)
 		om.add(m0)
@@ -773,13 +863,12 @@ class Game:
 		m1 = Machine(t, eventd, camera, svt)
 		m1.set_position(200, 0)
 		om.add(m1)
-		#floor0 = Sprite
 		
 		m2 = Machine(t, eventd, camera, svt)
 		m2.set_position(300, 0)
 		om.add(m2)
 		
-		b0 = Boy(t, eventd, camera, svt)
+		b0 = Boy(t, eventd, camera, svt, om)
 		b0.set_position(0, 0)
 		om.add(b0)
 
@@ -815,11 +904,12 @@ class Game:
 			
 			#print("-- Loop end --")
 			
-			clock.tick(60)
+			clock.tick(FPS)
 			frame += 1
 
 
 pygame.init()
+font_time = pygame.font.SysFont("terminus", 20)
 terminus = pygame.font.SysFont("terminus", 16)
 screen = pygame.display.set_mode((320*2, 240*2))
 
