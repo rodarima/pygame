@@ -3,7 +3,7 @@ import pyganim
 from pympler import asizeof
 from pygame import gfxdraw
 
-FPS = 60
+FPS = 50
 REC_RECORDING = 0
 REC_WAITING = 1
 REC_PLAYING = 2
@@ -252,7 +252,7 @@ class Gravity:
 		self.falling_start = d['falling_start']
 
 KEY_JUMP = pygame.K_UP
-KEY_ACTION = pygame.K_SPACE
+KEY_ACTION = pygame.K_DOWN
 
 class Boy(SpriteT, Gravity):
 	def __init__(self, t, eventd, cam, svt, om):
@@ -303,7 +303,8 @@ class Boy(SpriteT, Gravity):
 			if e.key == pygame.K_LEFT: self.vx = -1
 			elif e.key == pygame.K_RIGHT: self.vx = 1
 			#elif e.key == pygame.K_DOWN: self.vy = -1
-			elif e.key == KEY_JUMP: self.vy = 2
+			elif e.key == KEY_JUMP:
+				if not self.falling: self.vy = 3
 			elif e.key == KEY_ACTION: self.eventd.event(e, self)
 		elif e.type == pygame.KEYUP:
 			if e.key == pygame.K_LEFT: self.vx = 0
@@ -348,6 +349,7 @@ class Boy(SpriteT, Gravity):
 		if(self.disabled): return
 		#print('Boy update')
 		Gravity.update_velocity(self, t)
+		if self.vy < -30: sys.exit()
 		self.update_position(t)
 		self.frame(abs(self.vx))
 		self.cam.update()
@@ -425,7 +427,7 @@ class Machine(SpriteT, BlockState):
 	
 	def event(self, e, t, from_obj):
 		#print('Machine event from ' + str(from_obj.i) + ' at ' + str(t))
-		if not ((e.type == pygame.KEYDOWN) and (e.key == pygame.K_SPACE)):
+		if not ((e.type == pygame.KEYDOWN) and (e.key == KEY_ACTION)):
 			return False
 
 		if self.state == MACHINE_OFF:
@@ -499,6 +501,10 @@ class Machine(SpriteT, BlockState):
 
 		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		abs_pos = (self.rx, self.ry)
+		if self.blocked() and not self.obj_block.disabled:
+			n = self.obj_block.i
+			name = terminus.render(str(n), 1, (255,0,0))
+			screen.blit(name, (scr_pos[0]+12, scr_pos[1]-self.rect.h-15))
 		
 		#print('Machine screen position: ' + str(scr_pos))
 		#print('Machine absolute position: ' + str(abs_pos))
@@ -603,12 +609,16 @@ class ObjectManager:
 	"""Permite encontrar objetos por la posicion"""
 	def __init__(self):
 		self.objects = [] #pygame.sprite.Group()
-		self.i = 0
+		self.boyi = 1
 		self.walls = [] #pygame.sprite.Group()
 
+	def set_eventd(self, eventd):
+		self.eventd = eventd
+
 	def add(self, obj):
-		obj.i = self.i
-		self.i += 1
+		if isinstance(obj, Boy):
+			obj.i = self.boyi
+			self.boyi += 1
 		self.objects.append(obj)
 
 	def collide(self, obj):
@@ -617,11 +627,12 @@ class ObjectManager:
 		return pygame.sprite.spritecollide(obj, self.objects, False)
 
 	def update(self, rel_t):
-		#TODO: Actualizar primero el personaje activo
 		
+		self.eventd.active_boy.update(rel_t)
 		for obj in self.objects+self.walls:
 			#print('Updating object: ' + str(obj))
-			obj.update(rel_t)
+			if(obj != self.eventd.active_boy):
+				obj.update(rel_t)
 
 	def disable_boys(self):
 		for obj in self.objects:
@@ -686,7 +697,7 @@ class Camera:
 		#print('Camera obj relative to '+str(self.obj_coord))
 		#print('Camera screen center '+str((wm, hm)))
 		cx = wm - rx - wb/2
-		cy = hm - ry - hb/2
+		cy = hm - 0*ry - hb/2
 
 		self.camera = (int(cx), int(cy))
 		#print('Camera update '+str(self.camera))
@@ -754,7 +765,7 @@ class SVT:
 
 	def print_time(self, rel_t):
 		label = font_time.render('Time: ' + str(int(rel_t/FPS)), 1, (100,100,100))
-		screen.blit(label, (300, 10))
+		screen.blit(label, (280, 30))
 
 	def enable_machines(self, m):
 		'Activa todas las máquinas excepto la actual'
@@ -791,7 +802,7 @@ class SVT:
 		
 		b = Boy(start, self.eventd, self.cam, self, self.om)
 		# TODO: Ajustar esta posicion para que quede en el centro
-		b.set_position(machine.rx, machine.ry)
+		b.set_position(machine.rx +7, machine.ry)
 		self.om.add(b)
 		
 		self.cam.follow(b)
@@ -855,6 +866,9 @@ class Game:
 	def level1(self, t, eventd, camera, om, svt):
 		w0 = Wall((-50, 0), (400, 1), camera)
 		om.add_wall(w0)
+		
+		w1 = Wall((50, 50), (200, 1), camera)
+		om.add_wall(w1)
 
 		m0 = Machine(t, eventd, camera, svt)
 		m0.set_position(100, 0)
@@ -886,6 +900,7 @@ class Game:
 		camera = Camera()
 		svt = SVT(om, eventd, camera)
 		eventd.set_svt(svt)
+		om.set_eventd(eventd)
 
 		self.level1(t, eventd, camera, om, svt)
 
@@ -909,7 +924,7 @@ class Game:
 
 
 pygame.init()
-font_time = pygame.font.SysFont("terminus", 20)
+font_time = pygame.font.SysFont("terminus", 30)
 terminus = pygame.font.SysFont("terminus", 16)
 screen = pygame.display.set_mode((320*2, 240*2))
 
