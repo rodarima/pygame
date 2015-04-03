@@ -1,5 +1,4 @@
 import sys, pygame, time
-import pyganim
 from pympler import asizeof
 from pygame import gfxdraw
 
@@ -15,6 +14,7 @@ class Recording():
 		self.start_time = t
 		self.end_time = 0
 		self.events = []
+		self.i = -1
 
 		self.last_start = 0.0
 		self.play_start = 0
@@ -44,7 +44,7 @@ class Recording():
 		return [e[1] for e in self.events]
 
 	def play(self, play_start):
-		print('Recording PLAY start = {0}'.format(play_start))
+#		print('Recording PLAY start = {0}'.format(play_start))
 		if self.end_time < play_start:
 			self.state = REC_STOPPED
 			print('Recording STOPPED')
@@ -173,6 +173,8 @@ class SpriteT(pygame.sprite.Sprite):
 		self.vx, self.vy = d['v']
 		self.ax, self.ay = d['a']
 		self.last_time = d['last_time']
+		print('spriteT:\trestoring obj{} at ({}, {})'.format(
+			self.i, self.rx, self.ry))
 
 class BlockState():
 
@@ -330,7 +332,9 @@ class Boy(SpriteT, Gravity):
 			elif e.key == pygame.K_RIGHT: self.vx = 0
 			#elif e.key == pygame.K_DOWN: self.vy = 0
 			#elif e.key == KEY_JUMP: self.vy = 0
-			#elif e.key == KEY_ACTION: self.eventd.event(e, self, t)
+			elif e.key == KEY_ACTION:
+				self._do_action(e, t)
+
 
 		return True
 
@@ -459,6 +463,7 @@ class Machine(SpriteT, BlockState):
 	def event(self, e, t, from_obj):
 		#print('Machine event from ' + str(from_obj.i) + ' at ' + str(t))
 		if not ((e.type == pygame.KEYDOWN) and (e.key == KEY_ACTION)):
+			print('machine{}:\tignoring unknown event key'.format(self.i))
 			return False
 
 		print('machine{}:\tnew event t={}'.format(self.i, t))
@@ -469,30 +474,56 @@ class Machine(SpriteT, BlockState):
 					':ERROR, máquina bloqueada y apagada')
 				sys.exit()
 			else:
-				print('machine{}:\tblocking from i={} at t={}'.format(self.i,
+				print('machine{}:\tprogramming from i={} at t={}'.format(self.i,
 					from_obj.i, t))
-				self.block(from_obj)
-				self.action = 1
+				#self.block(from_obj)
+				#self.action = 1
+				self.program(t)
 		else: #Encendida o encendiendo
-			if not self.blocked():
-				print(str(t)+
-					':ERROR, máquina desbloqueada y encendida')
-				sys.exit()
-			if self.is_blocked_by(from_obj):
-				print('machine{}:\tunblocking from {}'.format(self.i, from_obj.i))
-				self.unblock()
-				self.poweroff(from_obj, t)
-			elif self.obj_block.disabled:
-				self.unblock()
-				self.poweroff(from_obj, t)
-			elif from_obj != self.eventd.active_boy and \
-				self.is_blocked_by(self.eventd.active_boy):
-				print('machine{}:\taltered past detected'.format(self.i))
-				sys.exit()
-				return False
-			else:
-				print('machine{}:\tignoring event'.format(self.i))
-				return False
+			#if not self.blocked():
+			#	print(str(t)+
+			#		':ERROR, máquina desbloqueada y encendida')
+			#	sys.exit()
+			if self.blocked():
+				#FIXME: Por que no puedo introducirme en la máquina?
+				if self.is_blocked_by(from_obj):
+				#	or from_obj == self.eventd.active_boy:
+					print('machine{}:\tunblocking from {}'.format(self.i, from_obj.i))
+					self.unblock()
+					self.poweroff(from_obj, t)
+				elif (not self.is_blocked_by(from_obj)) and\
+					from_obj != self.eventd.active_boy:
+					print('machine{}:\taltered past detected'.format(self.i))
+					print('machine{}:\tblocked by boy{} but not for boy{}'.format(
+						self.i, self.obj_block.i, from_obj.i))
+					sys.exit()
+				else:
+					print('machine{}:\tyou can not use this machine!!!'.format(self.i))
+					print('machine{}:\tonly boy{} can use me!!!'.format(
+						self.i, self.obj_block.i))
+					return True
+			else:	#La máquina está desbloqueada, está libre
+				if from_obj != self.eventd.active_boy:
+					print('machine{}:\taltered past detected'.format(self.i))
+					print('machine{}:\tunblocked but not blocked by boy{}'.format(
+						self.i, from_obj.i))
+					sys.exit()
+				else:
+					print('machine{}:\tpowering off by boy{}'.format(
+						self.i, from_obj.i))
+					self.poweroff(from_obj, t)
+
+#			elif self.obj_block.disabled:
+#				self.unblock()
+#				self.poweroff(from_obj, t)
+#			elif from_obj != self.eventd.active_boy and \
+#				self.is_blocked_by(self.eventd.active_boy):
+#				print('machine{}:\taltered past detected'.format(self.i))
+#				sys.exit()
+#				return False
+#			else:
+#				print('machine{}:\tignoring event'.format(self.i))
+#				return False
 
 
 		return True
@@ -530,7 +561,7 @@ class Machine(SpriteT, BlockState):
 	def draw(self, t):
 		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		abs_pos = (self.rx, self.ry)
-		if self.blocked() and not self.obj_block.disabled:
+		if self.blocked():
 			n = self.obj_block.i
 			name = terminus.render(str(n), 1, (255,0,0))
 			screen.blit(name, (scr_pos[0]+12, scr_pos[1]-self.rect.h-15))
@@ -538,9 +569,9 @@ class Machine(SpriteT, BlockState):
 
 	def update(self, t):
 		#print('Machine update')
-		if(self.action and self.state == MACHINE_OFF):
-			self.action = 0
-			self.program(t)
+		#if(self.action and self.state == MACHINE_OFF):
+		#	self.action = 0
+		#	self.program(t)
 		if(self.state in (MACHINE_TIMER0, MACHINE_TIMER1)):
 			self.update_timer(t)
 		self.frame()
@@ -601,7 +632,8 @@ class EventControl:
 		#print('EventControl dispatched')
 		self._filter_key_events()
 		for e in self.raw_events:
-			if e.type == pygame.QUIT:
+			if e.type == pygame.QUIT or\
+				(e.type == pygame.KEYDOWN and e.key == pygame.K_q):
 				print('Exiting')
 				sys.exit()
 
@@ -697,7 +729,7 @@ class ObjectManager:
 		for obj in self.objects:
 			if isinstance(obj, Boy):
 				obj.disable()
-				print('Disable boy' + str(obj.i))
+				print('om:\t\tdisable boy{}'.format(obj.i))
 
 	def restore_boy(self, d, boy):
 		for t in d['l']:
@@ -739,6 +771,7 @@ class Camera:
 		self.camera = (0, 0)
 
 	def follow(self, obj):
+		print('camera:\t\tnow following boy{}'.format(obj.i))
 		self.obj = obj
 
 	def update(self):
@@ -759,6 +792,7 @@ class Camera:
 		cy = hm - 0*ry - hb/2
 
 		self.camera = (int(cx), int(cy))
+		#print('camera:\t\tupdate')
 		#print('Camera update '+str(self.camera))
 
 
@@ -772,8 +806,10 @@ class Camera:
 # SVT = Sistema de viajes temporales
 class SVT:
 	def __init__(self, om, eventd, cam):
-		self.recordlist = []
-		self.clonelist = []
+		self.recordlist = []	#Grabaciones por personaje
+		self.clonelist = []		#Clones al encender las máquinas
+		self.blocklist = []		#Máquinas que han de bloquearse
+
 		self.om = om
 		self.eventd = eventd
 		self.cam = cam
@@ -787,12 +823,13 @@ class SVT:
 
 	def travel(self, time_now, time_past):
 		'Viaja al pasado en el tiempo'
-		print(str(time_now)+':Travelling from {0} to {1}'.format(
-			time_now, time_past))
+		print('svt:\t\ttraveling {} <--------------------- {}'.format(
+			time_past, time_now))
 		self.inc_t += time_now - time_past
 
 
 	def find_last_machine(self, m):
+		'Encuentra la última clonación producida por una máquina'
 		last = None
 		for t in self.clonelist:
 			if t[0] == m:
@@ -802,10 +839,17 @@ class SVT:
 		return last
 
 	def find_boy(self, boy):
-		# FIXME: Y si existen varias grabaciones para un mismo personaje?
+		'Encuentra la grabación correspondiente a un personaje'
+		entry = None
 		for t in self.recordlist:
 			if t[0] == boy:
-				return t
+				if entry != None:
+					print('svt:\t\tmultiple records')
+					sys.exit()
+				entry = t
+
+		return entry
+
 	def find_rec(self, rec):
 		for t in self.recordlist:
 			if t[1] == rec:
@@ -830,10 +874,12 @@ class SVT:
 		abs_t = rel_t + self.inc_t
 		item = (machine, clone, rel_t, boy_clone, abs_t)
 		self.clonelist.append(item)
-		#print('Lista de clones ' + str(self.clonelist))
+		print('Lista de clones ' + str(self.clonelist))
 
 	def rec_play(self, rel_t):
 		'Pone todas las grabaciones a reproducirse en rel_t'
+		print('svt:\t\tall recording started at t={}'.format(
+			rel_t))
 		for t in self.recordlist:
 			t[1].play(rel_t)
 
@@ -844,6 +890,8 @@ class SVT:
 	def enable_machines(self, m):
 		'Activa todas las máquinas excepto la actual'
 
+	#def block_machine(self, entry, machine)
+
 	def off(self, machine, rel_t):
 		'Viaje en el tiempo'
 		tm = self.find_last_machine(machine)
@@ -851,19 +899,22 @@ class SVT:
 
 		oldboy = tb[0]
 		machine = tm[0]
-		rec = tb[1]
+		oldrec = tb[1]
 		start = tm[2]
 
 		self.travel(rel_t, start)
 
-		rec.finish(rel_t)
+		oldrec.finish(rel_t)
 
 		self.om.disable_boys()
 
-		print('Restaurando '+str(tm[1]))
+		print('svt:\t\trestoring previous clone')
+		print(str(tm[1]))
 		self.om.restore(tm[1])
-		oldboy.update(start)
-		machine.update(start)
+
+		#TODO: Por que hace falta actualizar ahora?
+#		oldboy.update(start)
+#		machine.update(start)
 
 		self.rec_play(start)
 
@@ -882,23 +933,36 @@ class SVT:
 		self.cam.follow(b)
 		b.activate(start)
 
+		new_entry = self.find_boy(b)
+		newrec = new_entry[1]
+		#Bloquear la máquina al restaurarla.
+		print('svt:\t\tadding machine{} to blocklist'.format(machine.i))
+		self.blocklist.append((machine, newrec, oldrec))
+
+		# Y bloquearla de inmediato, ya que rec no avisará, pues ya ha
+		# comenzado.
+		self.block_machine(newrec)
+
 	def new_boy(self, boy, rel_t):
 		if self.eventd.active_boy == None: return
 		if boy.i != self.eventd.active_boy.i: return
 
 		rec = Recording(rel_t, self)
-		clone = boy.clone()
-		self.recordlist.append((boy, rec, clone))
+		rec.i = boy.i
+		boy_clone = boy.clone()
+		print('svt:\t\tcloning boy{}'.format(boy.i))
+		print(str(boy_clone))
+		self.recordlist.append((boy, rec, boy_clone))
 		#print(self.recordlist)
 
 	def update(self, abs_t):
 		'Actualiza todo el juego usando el tiempo absoluto'
 		rel_t = self.rel(abs_t)
+		self.om.update(rel_t)
 		self.dispatch(rel_t)
 		self.eventd.dispatch(rel_t)
 		# El tiempo puede cambiar ahora despues de actualizar eventd
 		rel_t = self.rel(abs_t)
-		self.om.update(rel_t)
 		self.print_time(rel_t)
 
 	def dispatch(self, rel_t):
@@ -925,15 +989,71 @@ class SVT:
 		boy = tup[0]
 		boy.disable()
 
-		#TODO Reactivar objetos bloqueados
+		# Desbloquear la máquina
+		# TODO: Ya había sido desbloqueada por la propia máquina?
+		block = self.find_block_by_end_rec(rec)
+		machine = block[0]
+		print('svt:\t\tunblocking machine{}'.format(machine.i))
+		machine.unblock()
+
+	def find_block_by_start_rec(self, rec):
+		for t in self.blocklist:
+			if t[1] == rec:
+				return t
+		return None
+
+	def find_block_by_end_rec(self, rec):
+		for t in self.blocklist:
+			if t[2] == rec:
+				return t
+		return None
+
+	def print_blocklist(self):
+		print('svt:\t\tblocklist:')
+		for t in self.blocklist:
+			machine = t[0]
+			start_rec = t[1]
+			end_rec = t[2]
+			start_entry = self.find_rec(start_rec)
+			end_entry = self.find_rec(end_rec)
+			start_boy = start_entry[0]
+			end_boy = end_entry[0]
+			print('\tmachine{}, start rec{} boy{}, end rec{} boy{}'.format(
+				machine.i, start_rec.i, start_boy.i,
+				end_rec.i, end_boy.i))
+
+	def block_machine(self, rec):
+		# Bloquear la máquina
+		print('svt:\t\tblock_machine')
+		self.print_blocklist()
+		block = self.find_block_by_start_rec(rec)
+		if(block == None):
+			print('svt:\t\tno need to block machine for rec{}'.format(rec.i))
+			return
+
+		machine = block[0]
+		end_rec = block[2]
+		end_entry = self.find_rec(end_rec)
+		block_boy = end_entry[0]
+		print('svt:\t\tblocking machine{} by boy{}'.format(machine.i, block_boy.i))
+		machine.block(block_boy)
 
 	def start_record(self, rec):
 		'Al comienzo de una grabación, restaurar el personaje'
 		tup = self.find_rec(rec)
 		boy = tup[0]
-		boy.restore(tup[2])
+		boy_clone = tup[2]
+		print('svt:\t\tstarting previous recording of boy{}'.format(boy.i))
+		print('svt:\t\trestoring previous clone of boy{}'.format(boy.i))
+		print(str(boy_clone))
+
+		print('svt:\t\tstarting recording for boy{}'.format(boy.i))
 		boy.enable()
-		print('Starting record for boy' + str(boy.i))
+		boy.restore(boy_clone)
+
+		#Block machine by the boy who activated in the past
+		self.block_machine(rec)
+
 
 class Game:
 
