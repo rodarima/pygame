@@ -437,8 +437,8 @@ class Machine(SpriteT, BlockState):
 		self.img_frames = 4
 		self.img_frame = 0
 		self.state = MACHINE_OFF
-		self.timer_time = 3.0
-		self.timer_step = 0.5
+		self.timer_time = 3.0 * 50
+		self.timer_step = 0.5 * 50
 		self.timer_start = 0.0
 		self.action = 0
 		self.rect = pygame.Rect((0,0), (self.imgw, self.imgh))
@@ -479,7 +479,7 @@ class Machine(SpriteT, BlockState):
 				#self.block(from_obj)
 				#self.action = 1
 				self.program(t)
-		else: #Encendida o encendiendo
+		elif self.state == MACHINE_ON:
 			#if not self.blocked():
 			#	print(str(t)+
 			#		':ERROR, máquina desbloqueada y encendida')
@@ -512,6 +512,9 @@ class Machine(SpriteT, BlockState):
 					print('machine{}:\tpowering off by boy{}'.format(
 						self.i, from_obj.i))
 					self.poweroff(from_obj, t)
+		else: #Encendiendo
+			print('machine{}:\tyou cannot use me while powering'.format(
+						self.i))
 
 #			elif self.obj_block.disabled:
 #				self.unblock()
@@ -874,7 +877,7 @@ class SVT:
 		abs_t = rel_t + self.inc_t
 		item = (machine, clone, rel_t, boy_clone, abs_t)
 		self.clonelist.append(item)
-		print('Lista de clones ' + str(self.clonelist))
+		#print('Lista de clones ' + str(self.clonelist))
 
 	def rec_play(self, rel_t):
 		'Pone todas las grabaciones a reproducirse en rel_t'
@@ -909,7 +912,7 @@ class SVT:
 		self.om.disable_boys()
 
 		print('svt:\t\trestoring previous clone')
-		print(str(tm[1]))
+		#print(str(tm[1]))
 		self.om.restore(tm[1])
 
 		#TODO: Por que hace falta actualizar ahora?
@@ -951,7 +954,7 @@ class SVT:
 		rec.i = boy.i
 		boy_clone = boy.clone()
 		print('svt:\t\tcloning boy{}'.format(boy.i))
-		print(str(boy_clone))
+		#print(str(boy_clone))
 		self.recordlist.append((boy, rec, boy_clone))
 		#print(self.recordlist)
 
