@@ -2,7 +2,7 @@ import sys, pygame, time
 from pympler import asizeof
 from pygame import gfxdraw
 
-FPS = 1
+FPS = 50
 REC_RECORDING = 0
 REC_WAITING = 1
 REC_PLAYING = 2
@@ -201,8 +201,12 @@ class BlockState():
 	def restore(self, d):
 		self.obj_block = d['block']
 
+class Collider:
+	def collide(self, obj):
+		raise NotImplemented()
 
-class Wall(pygame.sprite.Sprite):
+
+class Wall(pygame.sprite.Sprite, Collider):
 	def __init__(self, pos, size, cam):
 		pygame.sprite.Sprite.__init__(self);
 		self.pos = pos
@@ -218,6 +222,9 @@ class Wall(pygame.sprite.Sprite):
 		scr_pos = self.cam.get_screen_position(self.pos[0], self.pos[1])
 		self.rect.bottomleft = scr_pos
 
+	def collide(self, obj):
+		return pygame.sprite.collide_rect(obj, self)
+
 	def update(self, rel_t):
 		scr_pos = self.cam.get_screen_position(self.pos[0], self.pos[1])
 		self.rect.bottomleft = scr_pos
@@ -226,17 +233,238 @@ class Wall(pygame.sprite.Sprite):
 	#def clone(self): return None
 	#def restore(self, d): pass
 
+
+
+class LeverButton(pygame.sprite.Sprite):
+
+	LEVER_OFF = 0
+	LEVER_ON = 1
+
+	def __init__(self, pos, eventd, cam, svt, om):
+		pygame.sprite.Sprite.__init__(self);
+		self.img = SpriteT.load_image(self, "../img/lever.gif")
+		self.eventd = eventd
+		self.imgx = 0
+		self.imgy = 0
+		self.imgw = 13
+		self.imgh = 14
+		self.frames = 9
+		self.frame = 0
+		self.state = self.LEVER_OFF
+		self.boy = None
+		self.target = None
+		self.pos = pos
+		self.rect = pygame.Rect(self.pos, (self.imgw, self.imgh))
+		self.i = -1
+		self.cam = cam
+		self.svt = svt
+		self.om = om
+		self.surf = self.img.subsurface(
+			self.frame * self.imgw + self.imgx,
+			self.imgy,
+			self.imgw,
+			self.imgh)
+
+#		self.update_frame()
+
+	def update_frame(self):
+		if(self.state == self.LEVER_OFF and self.frame != 0):
+			self.frame -= 1
+		elif(self.state == self.LEVER_ON and self.frame != self.frames-1):
+			self.frame += 1
+
+		#print('leverbutton{}:\tframe = {}'.format(self.i, self.frame))
+
+		self.surf = self.img.subsurface(
+			self.frame * self.imgw + self.imgx,
+			self.imgy,
+			self.imgw,
+			self.imgh)
+
+	def set_target(self, obj):
+		self.target = obj
+
+	def action(self, t):
+		if(self.target == None): return
+
+		d = {}
+		d['code'] = self.state
+		ev = pygame.event.Event(pygame.USEREVENT, d)
+		self.eventd.event_to(ev, self, self.target, t)
+
+	def pull(self, from_obj):
+		if self.boy == None:
+			self.boy = from_obj
+			self.state = self.LEVER_ON
+			print('leverbutton{}:\tboy{} pulls the lever'.format(
+				self.i, self.boy.i))
+		elif self.boy == self.eventd.active_boy:
+			print('leverbutton{}:\taltered past detected'.format(
+				self.i))
+			print('leverbutton{}:\tboy{} wants to change state'.format(
+				self.i, from_obj.i))
+			sys.exit()
+		else:
+			print('leverbutton{}:\tignoring event from unknown boy{}'.format(
+				self.i, from_obj.i))
+			return False
+
+	def release(self, from_obj):
+		if self.boy != from_obj:
+#			if self.boy == self.eventd.active_boy:
+#				print('leverbutton{}:\taltered past detected'.format(
+#					self.i))
+#				print('leverbutton{}:\tboy{} wants to change state'.format(
+#					self.i, from_obj.i))
+#				sys.exit()
+#			else:
+			print('leverbutton{}:\tignoring event from unknown boy{}'.format(
+				self.i, from_obj.i))
+			return False
+		elif self.boy == from_obj:
+			print('leverbutton{}:\tboy{} releases the lever'.format(
+				self.i, self.boy.i))
+			self.boy = None
+			self.state = self.LEVER_OFF
+
+	def event(self, e, rel_t, from_obj):
+		print('leverbutton{}:\tevent at t={}'.format(self.i, rel_t))
+
+		if e.key != KEY_ACTION:
+			print('leverbutton{}:\tignoring unknown key'.format(self.i))
+			return False
+
+		if not isinstance(from_obj, Boy):
+			print('leverbutton{}:\tevent not from boy'.format(self.i))
+			return False
+
+
+		if e.type == pygame.KEYDOWN:
+			self.pull(from_obj)
+		elif e.type == pygame.KEYUP:
+			self.release(from_obj)
+		else:
+			print('leverbutton{}:\tignoring unknown event type'.format(self.i))
+			return False
+
+
+		print('leverbutton{}:\tstate now {}'.format(self.i, self.state))
+		#TODO: Solo enviar acción cuando realmente hace falta
+		self.action(rel_t)
+
+		return True
+
+	def collide_boy(self):
+		lobj = self.om.collide(self)
+		if(self.boy not in lobj):
+			print('leverbutton{}:\tboy{} leaving'.format(self.i, self.boy.i))
+			self.boy = None
+			self.state = self.LEVER_OFF
+
+	def update(self, rel_t):
+		#Recalc position for camera
+		scr_pos = self.cam.get_screen_position(self.pos[0], self.pos[1])
+		self.rect.bottomleft = scr_pos
+
+		#Comprobar que el personaje sigue activando la palanca
+		if(self.boy != None): self.collide_boy()
+
+		#Set frame
+		self.update_frame()
+
+		#Draw
+		screen.blit(self.surf, self.rect)
+
+	def clone(self):
+		d = {}
+		d['frame'] = self.frame
+		d['state'] = self.state
+		d['boy'] = self.boy
+		return d
+
+	def restore(self, d):
+		self.frame = d['frame']
+		self.state = d['state']
+		self.boy = d['boy']
+#		print('leverbutton{}:\trestoring state {}'.format(self.i, self.state))
+#		print('leverbutton{}:\trestoring state {}'.format(self.i, self.frame))
+
+class PlatformSimple(pygame.sprite.Sprite, Collider):
+
+	PLATFORM_INACTIVE = 0
+	PLATFORM_ACTIVE = 1
+
+	def __init__(self, pos, size, cam):
+		pygame.sprite.Sprite.__init__(self);
+		self.state = self.PLATFORM_INACTIVE
+		self.pos = pos
+		self.i = -1
+		self.cam = cam
+		self.surf = pygame.Surface(size)
+		self.surf.fill((100,100,100))
+		self.rect = pygame.Rect((0,0), size)
+		self.rx, self.ry = pos
+
+	def collide(self, obj):
+		if self.state == self.PLATFORM_INACTIVE: return False
+		elif self.state == self.PLATFORM_ACTIVE:
+			return pygame.sprite.collide_rect(obj, self)
+
+	def event(self, e, rel_t, from_obj):
+		print('platform{}:\tevent at t={}'.format(self.i, rel_t))
+
+		if e.type != pygame.USEREVENT:
+			print('platform{}:\tignoring no user event'.format(self.i))
+			return False
+
+		print('platform{}:\tevent:'.format(self.i))
+		print(str(e))
+
+		if e.code == 0:
+			self.state = self.PLATFORM_INACTIVE
+		elif e.code == 1:
+			self.state = self.PLATFORM_ACTIVE
+		else:
+			print('platform{}:\tignoring unknown event code'.format(self.i))
+			return False
+
+
+		print('platform{}:\tstate now {}'.format(self.i, self.state))
+
+		return True
+
+	def update(self, rel_t):
+
+		# No hacer nada si está desactivada
+		if(self.state != self.PLATFORM_ACTIVE):
+			return
+
+		#Recalc position for camera
+		scr_pos = self.cam.get_screen_position(self.pos[0], self.pos[1])
+		self.rect.bottomleft = scr_pos
+
+		#Draw
+		screen.blit(self.surf, self.rect)
+
+	def clone(self):
+		d = {}
+		d['state'] = self.state
+		return d
+
+	def restore(self, d):
+		self.state = d['state']
+
 class Gravity:
 	def __init__(self, om):
 		#self.k = 0.05
-		self.k = 0.05*FPS**2
+		self.k = 0.001*FPS
 		self.g = -9.81 * self.k
 		self.om = om
 		self.falling = False
 
 	def update_velocity(self, rel_t):
 
-		max_y = self.om.collide_walls(self)
+		max_y = self.om.colliders(self)
 		if max_y == None:
 			if not self.falling:
 				self.ay = self.g
@@ -315,13 +543,13 @@ class Boy(SpriteT, Gravity):
 		#	+str(from_obj) + ' at ' + str(t))
 
 		if e.type == pygame.KEYDOWN:
-			if e.key == pygame.K_LEFT: self.vx = -1.5*FPS
+			if e.key == pygame.K_LEFT: self.vx = -1.5/50*FPS
 
-			elif e.key == pygame.K_RIGHT: self.vx = 1.5*FPS
+			elif e.key == pygame.K_RIGHT: self.vx = 1.5/50*FPS
 			#elif e.key == pygame.K_DOWN: self.vy = -1
 
 			elif e.key == KEY_JUMP:
-				if not self.falling: self.vy = 7*FPS
+				if not self.falling: self.vy = 7/50*FPS
 
 			elif e.key == KEY_ACTION:
 				self._do_action(e, t)
@@ -372,7 +600,7 @@ class Boy(SpriteT, Gravity):
 		if(self.disabled): return
 		#print('Boy update')
 		Gravity.update_velocity(self, t)
-		if self.vy < -30*FPS: sys.exit()
+		if self.vy < -30*FPS/50: sys.exit()
 		self.update_position(t)
 		if self.vx != 0:	fn = +1
 		else: fn = 0
@@ -382,9 +610,9 @@ class Boy(SpriteT, Gravity):
 
 	def draw(self, t):
 		if(self.disabled): return
-		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
-		name = terminus.render(str(self.i), 1, (255,0,0))
-		screen.blit(name, (scr_pos[0]+5, scr_pos[1]-self.rect.h-15))
+#		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
+#		name = terminus.render(str(self.i), 1, (255,0,0))
+#		screen.blit(name, (scr_pos[0]+5, scr_pos[1]-self.rect.h-15))
 
 		screen.blit(self.surf, self.rect)
 
@@ -493,15 +721,16 @@ class Machine(SpriteT, BlockState):
 					self.poweroff(from_obj, t)
 				elif (not self.is_blocked_by(from_obj)) and\
 					from_obj != self.eventd.active_boy:
-					print('machine{}:\taltered past detected'.format(self.i))
+					#print('machine{}:\taltered past detected'.format(self.i))
 					print('machine{}:\tblocked by boy{} but not for boy{}'.format(
 						self.i, self.obj_block.i, from_obj.i))
-					sys.exit()
+					#sys.exit()
+					return False
 				else:
 					print('machine{}:\tyou can not use this machine!!!'.format(self.i))
 					print('machine{}:\tonly boy{} can use me!!!'.format(
 						self.i, self.obj_block.i))
-					return True
+					return False
 			else:	#La máquina está desbloqueada, está libre
 				if from_obj != self.eventd.active_boy:
 					print('machine{}:\taltered past detected'.format(self.i))
@@ -513,8 +742,13 @@ class Machine(SpriteT, BlockState):
 						self.i, from_obj.i))
 					self.poweroff(from_obj, t)
 		else: #Encendiendo
-			print('machine{}:\tyou cannot use me while powering'.format(
-						self.i))
+			if from_obj != self.eventd.active_boy:
+				print('machine{}:\taltered past detected'.format(self.i))
+				print('machine{}:\talready powering on'.format(self.i))
+				sys.exit()
+			else:
+				print('machine{}:\tyou cannot use me while powering'.format(
+					self.i))
 
 #			elif self.obj_block.disabled:
 #				self.unblock()
@@ -564,10 +798,10 @@ class Machine(SpriteT, BlockState):
 	def draw(self, t):
 		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		abs_pos = (self.rx, self.ry)
-		if self.blocked():
-			n = self.obj_block.i
-			name = terminus.render(str(n), 1, (255,0,0))
-			screen.blit(name, (scr_pos[0]+12, scr_pos[1]-self.rect.h-15))
+#		if self.blocked():
+#			n = self.obj_block.i
+#			name = terminus.render(str(n), 1, (255,0,0))
+#			screen.blit(name, (scr_pos[0]+12, scr_pos[1]-self.rect.h-15))
 		screen.blit(self.surf, self.rect)
 
 	def update(self, t):
@@ -610,6 +844,62 @@ class Machine(SpriteT, BlockState):
 
 		BlockState.restore(self, d['BlockState'])
 		SpriteT.restore(self, d['SpriteT'])
+
+
+class MachineExit:
+
+	def __init__(self, pos, cam, eventd):
+		self.img = SpriteT.load_image(self, "../img/machine.gif")
+		self.rx, self.ry = pos
+		self.imgx = 0
+		self.imgy = 0
+		self.imgw = 22
+		self.imgh = 32
+		self.img_frames = 4
+		self.img_frame = 3
+		self.state = MACHINE_ON
+		self.rect = pygame.Rect((0,0), (self.imgw, self.imgh))
+		self.i = -1
+		self.cam = cam
+		self.eventd = eventd
+
+		self.frame()
+
+	def frame(self):
+		self.surf = self.img.subsurface(
+			self.state * self.imgw + self.imgx,
+			self.imgy,
+			self.imgw,
+			self.imgh)
+
+	def event(self, e, t, from_obj):
+		#print('Machine event from ' + str(from_obj.i) + ' at ' + str(t))
+		if not ((e.type == pygame.KEYDOWN) and (e.key == KEY_ACTION)):
+			print('machine{}:\tignoring unknown event key'.format(self.i))
+			return False
+
+		if(from_obj != self.eventd.active_boy):
+			print('machine{}:\tignoring unknown boy{}'.format(
+				self.i, from_obj.i))
+			return False
+
+		print('machine{}:\tnew event t={}'.format(self.i, t))
+		print('machine{}:\tend of level'.format(self.i))
+		sys.exit()
+
+		return True
+
+	def draw(self, t):
+		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
+		self.rect.bottomleft = scr_pos
+		screen.blit(self.surf, self.rect)
+
+	def update(self, t):
+		self.draw(t)
+
+	def clone(self): return None
+	def restore(self, d): pass
+
 
 class Event:
 	def __init__(self, position, e):
@@ -655,6 +945,11 @@ class EventDaemon:
 	def event(self, e, obj_from, t):
 		print('eventd:\t\tnew event at t={} from i={}'.format(t,obj_from.i))
 		self.eventlist.append((e, obj_from, t))
+
+	def event_to(self, e, obj_from, obj_dst, t):
+		print('eventd:\t\tsending event at t={} from obj{} to obj{}'.format(
+			t, obj_from.i, obj_dst))
+		obj_dst.event(e, obj_from, t)
 
 #	def get(self):
 #		l = self.eventlist
@@ -752,6 +1047,16 @@ class ObjectManager:
 			return max_y
 		else:
 			return None
+
+	def colliders(self, obj):
+		list_collide = []
+		max_y = None
+		for wall in self.walls:
+			if(wall.collide(obj)):
+				if(max_y == None): max_y = wall.ry
+				elif wall.ry > max_y: max_y = wall.ry
+				list_collide.append(wall)
+		return max_y
 
 	def clone(self):
 		d = {}
@@ -887,8 +1192,10 @@ class SVT:
 			t[1].play(rel_t)
 
 	def print_time(self, rel_t):
-		label = font_time.render('Time: ' + str(int(rel_t/FPS)), 1, (100,100,100))
-		screen.blit(label, (280, 30))
+		w, h = screen.get_size()
+		label = font_time.render(str(int(rel_t/FPS)), 1, (100,100,100))
+#		screen.blit(label, (280, 30))
+		screen.blit(label, (w/2-label.get_width()/2, h-20-label.get_height()/2))
 
 	def enable_machines(self, m):
 		'Activa todas las máquinas excepto la actual'
@@ -1060,7 +1367,7 @@ class SVT:
 
 class Game:
 
-	def level1(self, t, eventd, camera, om, svt):
+	def level_test(self, t, eventd, camera, om, svt):
 		w0 = Wall((-50, 0), (400, 1), camera)
 		om.add_wall(w0)
 
@@ -1085,6 +1392,37 @@ class Game:
 		m3 = Machine(t, eventd, camera, svt)
 		m3.set_position(500, 0)
 		om.add(m3)
+
+		lb0 = LeverButton((70, 0), eventd, camera, svt, om)
+		om.add(lb0)
+
+		b0 = Boy(t, eventd, camera, svt, om)
+		b0.set_position(0, 0)
+		om.add(b0)
+
+		camera.follow(b0)
+		b0.activate(t)
+
+	def level1(self, t, eventd, camera, om, svt):
+		w0 = Wall((-50, 0), (100, 1), camera)
+		om.add_wall(w0)
+
+		w1 = Wall((150, 0), (50, 1), camera)
+		om.add_wall(w1)
+
+		m0 = Machine(t, eventd, camera, svt)
+		m0.set_position(-7, 0)
+		om.add(m0)
+
+		m1 = MachineExit((180, 0), camera, eventd)
+		om.add(m1)
+
+		ps0 = PlatformSimple((80, 0), (40, 1), camera)
+		om.add_wall(ps0)
+
+		lb0 = LeverButton((-30, 0), eventd, camera, svt, om)
+		lb0.set_target(ps0)
+		om.add(lb0)
 
 		b0 = Boy(t, eventd, camera, svt, om)
 		b0.set_position(0, 0)
