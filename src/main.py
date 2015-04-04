@@ -354,12 +354,13 @@ class LeverButton(pygame.sprite.Sprite):
 
 		return True
 
-	def collide_boy(self):
+	def collide_boy(self, rel_t):
 		lobj = self.om.collide(self)
 		if(self.boy not in lobj):
 			print('leverbutton{}:\tboy{} leaving'.format(self.i, self.boy.i))
 			self.boy = None
 			self.state = self.LEVER_OFF
+			self.action(rel_t)
 
 	def update(self, rel_t):
 		#Recalc position for camera
@@ -367,7 +368,8 @@ class LeverButton(pygame.sprite.Sprite):
 		self.rect.bottomleft = scr_pos
 
 		#Comprobar que el personaje sigue activando la palanca
-		if(self.boy != None): self.collide_boy()
+		if(self.boy != None):
+			self.collide_boy(rel_t)
 
 		#Set frame
 		self.update_frame()
@@ -713,7 +715,6 @@ class Machine(SpriteT, BlockState):
 			#		':ERROR, máquina desbloqueada y encendida')
 			#	sys.exit()
 			if self.blocked():
-				#FIXME: Por que no puedo introducirme en la máquina?
 				if self.is_blocked_by(from_obj):
 				#	or from_obj == self.eventd.active_boy:
 					print('machine{}:\tunblocking from {}'.format(self.i, from_obj.i))
@@ -848,7 +849,7 @@ class Machine(SpriteT, BlockState):
 
 class MachineExit:
 
-	def __init__(self, pos, cam, eventd):
+	def __init__(self, pos, cam, eventd, level):
 		self.img = SpriteT.load_image(self, "../img/machine.gif")
 		self.rx, self.ry = pos
 		self.imgx = 0
@@ -862,6 +863,7 @@ class MachineExit:
 		self.i = -1
 		self.cam = cam
 		self.eventd = eventd
+		self.level = level
 
 		self.frame()
 
@@ -885,7 +887,13 @@ class MachineExit:
 
 		print('machine{}:\tnew event t={}'.format(self.i, t))
 		print('machine{}:\tend of level'.format(self.i))
-		sys.exit()
+
+
+		# Send event to GameLogic to start a new level
+		d = {}
+		d['code'] = MACHINE_OFF
+		ev = pygame.event.Event(pygame.USEREVENT, d)
+		self.eventd.event_to(ev, self, self.level, t)
 
 		return True
 
@@ -949,7 +957,7 @@ class EventDaemon:
 	def event_to(self, e, obj_from, obj_dst, t):
 		print('eventd:\t\tsending event at t={} from obj{} to obj{}'.format(
 			t, obj_from.i, obj_dst))
-		obj_dst.event(e, obj_from, t)
+		obj_dst.event(e, t, obj_from)
 
 #	def get(self):
 #		l = self.eventlist
@@ -1110,6 +1118,135 @@ class Camera:
 	def get_screen_position(self, rx, ry):
 		w, h = screen.get_size()
 		return (rx+self.camera[0], h-(ry+self.camera[1]))
+
+class Scene:
+	def __init__(self, ec):
+		self.ec = ec
+
+	def update(self, *args):
+		'Update all scene at each frame'
+		raise NotImplemented()
+
+class SceneFailure(Scene):
+	def update(self, t):
+		print('Failure')
+
+class Level(Scene):
+	def __init__(self, ec, logic):
+		Scene.__init__(self, ec)
+		self.logic = logic
+		self.om = ObjectManager()
+		self.eventd = EventDaemon(self.ec, self.om)
+
+		self.camera = Camera()
+		self.svt = SVT(self.om, self.eventd, self.camera)
+		self.eventd.set_svt(self.svt)
+		self.om.set_eventd(self.eventd)
+		self.frame = 0
+
+	def update(self):
+		'Update level at each frame'
+		screen.fill((0, 0, 0))
+		self.svt.update(self.frame)
+		self.frame += 1
+
+class Level1(Level):
+	def __init__(self, ec, logic):
+		Level.__init__(self, ec, logic)
+
+		#Frame set at Level
+		t = self.frame
+
+		w0 = Wall((-50, 0), (100, 1), self.camera)
+		self.om.add_wall(w0)
+
+		w1 = Wall((150, 0), (50, 1), self.camera)
+		self.om.add_wall(w1)
+
+		m0 = Machine(t, self.eventd, self.camera, self.svt)
+		m0.set_position(-7, 0)
+		self.om.add(m0)
+
+		#Save reference on exit machine for compare later
+		self.m1 = MachineExit((180, 0), self.camera, self.eventd, self)
+		self.om.add(self.m1)
+
+		ps0 = PlatformSimple((80, 0), (40, 1), self.camera)
+		self.om.add_wall(ps0)
+
+		lb0 = LeverButton((-30, 0), self.eventd, self.camera, self.svt, self.om)
+		lb0.set_target(ps0)
+		self.om.add(lb0)
+
+		b0 = Boy(t, self.eventd, self.camera, self.svt, self.om)
+		b0.set_position(0, 0)
+		self.om.add(b0)
+
+		self.camera.follow(b0)
+		b0.activate(t)
+
+	def event(self, e, rel_t, from_obj):
+		print('level1:\t\tevent from ' + str(from_obj))
+		print('level1:\t\texpecting from ' + str(self.m1))
+		if(from_obj != self.m1):
+			print('level1:\t\tignoring event from unknown object')
+			return False
+
+		#Receive exit event from MachineExit
+		if not (e.type == pygame.USEREVENT and e.code == MACHINE_OFF):
+			print('level1:\t\tignoring unknown event')
+			return False
+
+		# End level, and go to the next.
+		self.logic.next_level()
+		return True
+
+
+class GameLogic:
+	def __init__(self):
+		self.ec = EventControl()
+		self.exit = False
+		self.levels = [Level1, Level1]
+		self.levelnum = 0
+		self.level = None
+		self.scenes = []
+		self.init_level()
+		self.scenes.append(self.level)
+
+	def play(self):
+		clock = pygame.time.Clock()
+
+		while not self.exit:
+
+			scene = self.scenes[0]
+			scene.update()
+
+			pygame.display.update()
+			pygame.display.flip()
+
+			clock.tick(50)
+
+	def next_level(self):
+		'Replace actual level by the next one'
+
+		print('GameLogic next_level() called')
+
+		self.levelnum += 1
+
+		if(self.levelnum >= len(self.levels)):
+			print('End of game!!')
+			sys.exit()
+
+		print('GameLogic starting level {}', self.levelnum+1)
+
+		self.init_level()
+
+		if(self.scenes == []): self.scenes.append(self.level)
+		else: self.scenes[0] = self.level
+
+	def init_level(self):
+		self.level = self.levels[self.levelnum](self.ec, self)
+
 
 # SVT = Sistema de viajes temporales
 class SVT:
@@ -1472,5 +1609,5 @@ screen = pygame.display.set_mode((320*2, 240*2))
 
 
 if __name__ == '__main__':
-	game = Game()
+	game = GameLogic()
 	game.play()
