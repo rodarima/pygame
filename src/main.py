@@ -13,11 +13,16 @@ EVENTCODE_ON = 1
 EVENTCODE_DIE = 2
 EVENTCODE_COLLIDE = 3
 EVENTCODE_INCOHERENCE = 4
+EVENTCODE_PAUSE = 5
 
 MACHINE_OFF = 0
 MACHINE_TIMER0 = 1
 MACHINE_TIMER1 = 2
 MACHINE_ON = 3
+
+KEY_JUMP = pygame.K_UP
+KEY_ACTION = pygame.K_DOWN
+KEY_OK = pygame.K_SPACE
 
 class Recording():
 	""" Records events for auto-play """
@@ -194,6 +199,9 @@ class SpriteT(pygame.sprite.Sprite):
 		self.vx, self.vy = d['v']
 		self.ax, self.ay = d['a']
 		self.last_time = d['last_time']
+		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
+		self.rect.bottomleft = scr_pos
+
 		print('spriteT:\trestoring obj{} at ({}, {})'.format(
 			self.i, self.rx, self.ry))
 
@@ -318,7 +326,7 @@ class LeverButton(pygame.sprite.Sprite):
 		ev = pygame.event.Event(pygame.USEREVENT, d)
 		self.eventd.event_to(ev, self, self.target, t)
 
-	def pull(self, from_obj):
+	def pull(self, t, from_obj):
 		if self.boy == None:
 			self.boy = from_obj
 			self.state = self.LEVER_ON
@@ -329,13 +337,13 @@ class LeverButton(pygame.sprite.Sprite):
 				self.i))
 			print('leverbutton{}:\tboy{} wants to change state'.format(
 				self.i, from_obj.i))
-			sys.exit()
+			self.svt.level_event(t, EVENTCODE_INCOHERENCE)
 		else:
 			print('leverbutton{}:\tignoring event from unknown boy{}'.format(
 				self.i, from_obj.i))
 			return False
 
-	def release(self, from_obj):
+	def release(self, t, from_obj):
 		if self.boy != from_obj:
 #			if self.boy == self.eventd.active_boy:
 #				print('leverbutton{}:\taltered past detected'.format(
@@ -366,9 +374,9 @@ class LeverButton(pygame.sprite.Sprite):
 
 
 		if e.type == pygame.KEYDOWN:
-			self.pull(from_obj)
+			self.pull(rel_t, from_obj)
 		elif e.type == pygame.KEYUP:
-			self.release(from_obj)
+			self.release(rel_t, from_obj)
 		else:
 			print('leverbutton{}:\tignoring unknown event type'.format(self.i))
 			return False
@@ -384,6 +392,8 @@ class LeverButton(pygame.sprite.Sprite):
 		lobj = self.om.collide(self)
 		if(self.boy not in lobj):
 			print('leverbutton{}:\tboy{} leaving'.format(self.i, self.boy.i))
+			print('leverbutton{}:\tboy{} at {},{}'.format(
+				self.i, self.boy.i, self.boy.rx,self.boy.ry))
 			self.boy = None
 			self.state = self.LEVER_OFF
 			self.action(rel_t)
@@ -414,7 +424,7 @@ class LeverButton(pygame.sprite.Sprite):
 		self.frame = d['frame']
 		self.state = d['state']
 		self.boy = d['boy']
-#		print('leverbutton{}:\trestoring state {}'.format(self.i, self.state))
+		print('leverbutton{}:\trestoring state {}'.format(self.i, self.state))
 #		print('leverbutton{}:\trestoring state {}'.format(self.i, self.frame))
 
 class PlatformSimple(pygame.sprite.Sprite, Collider):
@@ -481,6 +491,7 @@ class PlatformSimple(pygame.sprite.Sprite, Collider):
 
 	def restore(self, d):
 		self.state = d['state']
+		print('platform{}:\tstate after restore {}'.format(self.i, self.state))
 
 class Gravity:
 	def __init__(self, om):
@@ -516,9 +527,6 @@ class Gravity:
 
 	def restore(self, d):
 		self.falling = d['falling']
-
-KEY_JUMP = pygame.K_UP
-KEY_ACTION = pygame.K_DOWN
 
 class Boy(SpriteT, Gravity):
 	def __init__(self, t, eventd, cam, svt, om):
@@ -629,8 +637,7 @@ class Boy(SpriteT, Gravity):
 		#print('Boy update')
 		Gravity.update_velocity(self, t)
 		if self.vy < -30*FPS/50:
-			self.svt.restart_level(t, EVENTCODE_DIE)
-#			sys.exit()
+			self.svt.level_event(t, EVENTCODE_DIE)
 		self.update_position(t)
 		if self.vx != 0:	fn = +1
 		else: fn = 0
@@ -644,8 +651,8 @@ class Boy(SpriteT, Gravity):
 
 		for obj in objlist:
 			if obj == self: continue
-			if isinstance(obj, Boy):
-				self.svt.restart_level(t, EVENTCODE_COLLIDE)
+			if isinstance(obj, Boy) and obj.disabled == False:
+				self.svt.level_event(t, EVENTCODE_COLLIDE)
 				break
 
 	def draw(self, t):
@@ -737,7 +744,7 @@ class Machine(SpriteT, BlockState):
 		if self.state == MACHINE_OFF:
 			if self.blocked() == True:
 				print(str(t)+
-					':ERROR, máquina bloqueada y apagada')
+					':BUG, máquina bloqueada y apagada')
 				sys.exit()
 			else:
 				print('machine{}:\tprogramming from i={} at t={}'.format(self.i,
@@ -749,7 +756,6 @@ class Machine(SpriteT, BlockState):
 			#if not self.blocked():
 			#	print(str(t)+
 			#		':ERROR, máquina desbloqueada y encendida')
-			#	sys.exit()
 			if self.blocked():
 				if self.is_blocked_by(from_obj):
 				#	or from_obj == self.eventd.active_boy:
@@ -761,7 +767,6 @@ class Machine(SpriteT, BlockState):
 					#print('machine{}:\taltered past detected'.format(self.i))
 					print('machine{}:\tblocked by boy{} but not for boy{}'.format(
 						self.i, self.obj_block.i, from_obj.i))
-					#sys.exit()
 					return False
 				else:
 					print('machine{}:\tyou can not use this machine!!!'.format(self.i))
@@ -773,7 +778,7 @@ class Machine(SpriteT, BlockState):
 					print('machine{}:\taltered past detected'.format(self.i))
 					print('machine{}:\tunblocked but not blocked by boy{}'.format(
 						self.i, from_obj.i))
-					sys.exit()
+					self.svt.level_event(t, EVENTCODE_INCOHERENCE)
 				else:
 					print('machine{}:\tpowering off by boy{}'.format(
 						self.i, from_obj.i))
@@ -782,7 +787,7 @@ class Machine(SpriteT, BlockState):
 			if from_obj != self.eventd.active_boy:
 				print('machine{}:\taltered past detected'.format(self.i))
 				print('machine{}:\talready powering on'.format(self.i))
-				sys.exit()
+				self.svt.level_event(t, EVENTCODE_INCOHERENCE)
 			else:
 				print('machine{}:\tyou cannot use me while powering'.format(
 					self.i))
@@ -1048,7 +1053,7 @@ class EventDaemon:
 			#		str(l))
 			for obj in l:
 				if rel_t != e_t:
-					print('eventd:\t\tOffending time {} != {}'.format(rel_t, e_t))
+					print('eventd:\t\tBUG:Offending time {} != {}'.format(rel_t, e_t))
 					print(str(elem))
 					sys.exit()
 				print('eventd:\t\tsending event from {} at {} to {}'.format(
@@ -1218,7 +1223,7 @@ class SceneFailure(Scene):
 		self.ec.dispatch()
 		l = self.ec.get_keyboard()
 		for e in l:
-			if e.type == pygame.KEYDOWN:
+			if e.type == pygame.KEYDOWN and e.key == KEY_OK:
 				self.logic.pop_scene()
 				break
 
@@ -1267,6 +1272,7 @@ class Level1(Level):
 		self.om.add(self.m2)
 
 		ps0 = PlatformSimple((80, 0), (40, 1), self.camera)
+		self.om.add(ps0)
 		self.om.add_wall(ps0)
 
 		lb0 = LeverButton((-30-50, 0), self.eventd, self.camera, self.svt, self.om)
@@ -1298,6 +1304,9 @@ class Level1(Level):
 		elif(e.code == EVENTCODE_COLLIDE):
 			print('level1:\t\tevent collide received, restarting level')
 			self.logic.restart_level('Has colisionado con tu clon.')
+		elif(e.code == EVENTCODE_INCOHERENCE):
+			print('level1:\t\tevent incoherence received, restarting level')
+			self.logic.restart_level('Has alterado el pasado.')
 
 		# End level, and go to the next.
 		return True
@@ -1412,7 +1421,7 @@ class SVT:
 		for t in self.recordlist:
 			if t[0] == boy:
 				if entry != None:
-					print('svt:\t\tmultiple records')
+					print('svt:\t\tBUG:multiple records')
 					sys.exit()
 				entry = t
 
@@ -1624,9 +1633,8 @@ class SVT:
 		#Block machine by the boy who activated in the past
 		self.block_machine(rec)
 
-	def restart_level(self, rel_t, code):
-		'Boy has died. Restart level'
-		print('svt:\t\tsomething bad occurred :(')
+	def level_event(self, rel_t, code):
+		print('svt:\t\tsending event code = {} to level'.format(code))
 
 		d = {}
 		d['code'] = code
