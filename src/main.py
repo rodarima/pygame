@@ -8,6 +8,17 @@ REC_WAITING = 1
 REC_PLAYING = 2
 REC_STOPPED = 3
 
+EVENTCODE_OFF = 0
+EVENTCODE_ON = 1
+EVENTCODE_DIE = 2
+EVENTCODE_COLLIDE = 3
+EVENTCODE_INCOHERENCE = 4
+
+MACHINE_OFF = 0
+MACHINE_TIMER0 = 1
+MACHINE_TIMER1 = 2
+MACHINE_ON = 3
+
 class Recording():
 	""" Records events for auto-play """
 	def __init__(self, t, svt):
@@ -23,6 +34,16 @@ class Recording():
 
 		self.state = REC_RECORDING
 		self.svt = svt
+
+	def restart(self, t):
+		self.start_time = t
+		self.end_time = 0
+		self.events = []
+		self.last_start = 0.0
+		self.play_start = 0
+		self.play_end = 0
+		self.play_offset = 0.0
+		self.state = REC_RECORDING
 
 	def event(self, t, e):
 		if(self.state != REC_RECORDING): return
@@ -287,8 +308,13 @@ class LeverButton(pygame.sprite.Sprite):
 	def action(self, t):
 		if(self.target == None): return
 
+		if self.state == self.LEVER_OFF:
+			code = EVENTCODE_OFF
+		else:
+			code = EVENTCODE_ON
+
 		d = {}
-		d['code'] = self.state
+		d['code'] = code
 		ev = pygame.event.Event(pygame.USEREVENT, d)
 		self.eventd.event_to(ev, self, self.target, t)
 
@@ -422,9 +448,9 @@ class PlatformSimple(pygame.sprite.Sprite, Collider):
 		print('platform{}:\tevent:'.format(self.i))
 		print(str(e))
 
-		if e.code == 0:
+		if e.code == EVENTCODE_OFF:
 			self.state = self.PLATFORM_INACTIVE
-		elif e.code == 1:
+		elif e.code == EVENTCODE_ON:
 			self.state = self.PLATFORM_ACTIVE
 		else:
 			print('platform{}:\tignoring unknown event code'.format(self.i))
@@ -602,7 +628,9 @@ class Boy(SpriteT, Gravity):
 		if(self.disabled): return
 		#print('Boy update')
 		Gravity.update_velocity(self, t)
-		if self.vy < -30*FPS/50: sys.exit()
+		if self.vy < -30*FPS/50:
+			self.svt.restart_level(t, EVENTCODE_DIE)
+#			sys.exit()
 		self.update_position(t)
 		if self.vx != 0:	fn = +1
 		else: fn = 0
@@ -610,8 +638,20 @@ class Boy(SpriteT, Gravity):
 		self.cam.update()
 		SpriteT.update(self, t)
 
+	def collide_boys(self, t):
+		if self != self.eventd.active_boy: return
+		objlist = self.om.collide(self)
+
+		for obj in objlist:
+			if obj == self: continue
+			if isinstance(obj, Boy):
+				self.svt.restart_level(t, EVENTCODE_COLLIDE)
+				break
+
 	def draw(self, t):
 		if(self.disabled): return
+		# FIXME: Lugar poco apropiado para esta comprobación
+		self.collide_boys(t)
 #		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 #		name = terminus.render(str(self.i), 1, (255,0,0))
 #		screen.blit(name, (scr_pos[0]+5, scr_pos[1]-self.rect.h-15))
@@ -648,10 +688,6 @@ class Boy(SpriteT, Gravity):
 	def enable(self):
 		self.disabled = False
 
-MACHINE_OFF = 0
-MACHINE_TIMER0 = 1
-MACHINE_TIMER1 = 2
-MACHINE_ON = 3
 
 class Machine(SpriteT, BlockState):
 
@@ -846,6 +882,29 @@ class Machine(SpriteT, BlockState):
 		BlockState.restore(self, d['BlockState'])
 		SpriteT.restore(self, d['SpriteT'])
 
+class MachineStart(Machine):
+	def __init__(self, t, eventd, cam, svt):
+		Machine.__init__(self, t, eventd, cam, svt)
+		self.state = MACHINE_ON
+
+		# Send event to myself to clone the world
+		d = {}
+		d['code'] = MACHINE_ON
+		ev = pygame.event.Event(pygame.USEREVENT, d)
+		self.eventd.event_to(ev, self, self, t)
+
+	def event(self, e, t, from_obj):
+		if(from_obj != self):
+			print("machine{}:\tignoring all external events".format(self.i))
+			return False
+
+		if not (e.type == pygame.USEREVENT and e.code == MACHINE_ON):
+			print("machine{}:\tignoring unknown event".format(self.i))
+			return False
+
+		self.svt.on(self, t)
+		return True
+
 
 class MachineExit:
 
@@ -943,6 +1002,7 @@ class EventDaemon:
 
 	def __init__(self, event_control, om):
 		self.eventlist = []
+		self.event_to_list = []
 		self.ec = event_control
 		self.active_boy = None
 		self.object_manager = om
@@ -955,9 +1015,10 @@ class EventDaemon:
 		self.eventlist.append((e, obj_from, t))
 
 	def event_to(self, e, obj_from, obj_dst, t):
-		print('eventd:\t\tsending event at t={} from obj{} to obj{}'.format(
+		print('eventd:\t\tnew event at t={} from obj{} to obj{}'.format(
 			t, obj_from.i, obj_dst))
-		obj_dst.event(e, t, obj_from)
+#		obj_dst.event(e, t, obj_from)
+		self.event_to_list.append((e, obj_from, obj_dst, t))
 
 #	def get(self):
 #		l = self.eventlist
@@ -998,6 +1059,12 @@ class EventDaemon:
 		if(copyel != self.eventlist):
 			print("eventd:\t\teventlist alterada")
 		self.eventlist = []
+
+
+		for elem in self.event_to_list:
+			e, fr, to, et = elem
+			to.event(e, et, fr)
+		self.event_to_list = []
 
 
 class ObjectManager:
@@ -1128,8 +1195,32 @@ class Scene:
 		raise NotImplemented()
 
 class SceneFailure(Scene):
-	def update(self, t):
-		print('Failure')
+	def __init__(self, ec, text, logic):
+		Scene.__init__(self, ec)
+		self.logic = logic
+		self.text = text
+		print('SceneFailure:' + self.text)
+
+	def update(self):
+		w, h = screen.get_size()
+#		screen.fill((0, 0, 0, 200))
+
+		sh = 50
+		s = pygame.Surface((w,sh))
+		s.set_alpha(128)
+		s.fill((0,0,0))
+
+		screen.blit(s, (0, 0))
+
+		label = font_time.render(self.text, 1, (100,100,100))
+		screen.blit(label, (w/2-label.get_width()/2, sh/2-label.get_height()/2))
+
+		self.ec.dispatch()
+		l = self.ec.get_keyboard()
+		for e in l:
+			if e.type == pygame.KEYDOWN:
+				self.logic.pop_scene()
+				break
 
 class Level(Scene):
 	def __init__(self, ec, logic):
@@ -1139,7 +1230,7 @@ class Level(Scene):
 		self.eventd = EventDaemon(self.ec, self.om)
 
 		self.camera = Camera()
-		self.svt = SVT(self.om, self.eventd, self.camera)
+		self.svt = SVT(self.om, self.eventd, self.camera, self)
 		self.eventd.set_svt(self.svt)
 		self.om.set_eventd(self.eventd)
 		self.frame = 0
@@ -1157,24 +1248,28 @@ class Level1(Level):
 		#Frame set at Level
 		t = self.frame
 
-		w0 = Wall((-50, 0), (100, 1), self.camera)
+		w0 = Wall((-100, 0), (150, 1), self.camera)
 		self.om.add_wall(w0)
 
 		w1 = Wall((150, 0), (50, 1), self.camera)
 		self.om.add_wall(w1)
 
 		m0 = Machine(t, self.eventd, self.camera, self.svt)
-		m0.set_position(-7, 0)
+		m0.set_position(-50-7, 0)
 		self.om.add(m0)
 
 		#Save reference on exit machine for compare later
 		self.m1 = MachineExit((180, 0), self.camera, self.eventd, self)
 		self.om.add(self.m1)
 
+		self.m2 = MachineStart(t, self.eventd, self.camera, self.svt)
+		self.m2.set_position(-7, 0)
+		self.om.add(self.m2)
+
 		ps0 = PlatformSimple((80, 0), (40, 1), self.camera)
 		self.om.add_wall(ps0)
 
-		lb0 = LeverButton((-30, 0), self.eventd, self.camera, self.svt, self.om)
+		lb0 = LeverButton((-30-50, 0), self.eventd, self.camera, self.svt, self.om)
 		lb0.set_target(ps0)
 		self.om.add(lb0)
 
@@ -1186,19 +1281,25 @@ class Level1(Level):
 		b0.activate(t)
 
 	def event(self, e, rel_t, from_obj):
-		print('level1:\t\tevent from ' + str(from_obj))
-		print('level1:\t\texpecting from ' + str(self.m1))
-		if(from_obj != self.m1):
-			print('level1:\t\tignoring event from unknown object')
+		print('level1:\t\tevent from obj{}'.format(from_obj.i))
+
+		if e.type != pygame.USEREVENT:
+			print('level1:\t\tignoring no user event')
 			return False
 
 		#Receive exit event from MachineExit
-		if not (e.type == pygame.USEREVENT and e.code == MACHINE_OFF):
-			print('level1:\t\tignoring unknown event')
-			return False
+		if(e.code == EVENTCODE_OFF):
+			print('level1:\t\tevent off received: level complete')
+			self.logic.next_level()
+			return True
+		elif(e.code == EVENTCODE_DIE):
+			print('level1:\t\tevent die received, restarting level')
+			self.logic.restart_level('Has muerto.')
+		elif(e.code == EVENTCODE_COLLIDE):
+			print('level1:\t\tevent collide received, restarting level')
+			self.logic.restart_level('Has colisionado con tu clon.')
 
 		# End level, and go to the next.
-		self.logic.next_level()
 		return True
 
 
@@ -1218,7 +1319,8 @@ class GameLogic:
 
 		while not self.exit:
 
-			scene = self.scenes[0]
+			# Get last scene
+			scene = self.scenes[-1]
 			scene.update()
 
 			pygame.display.update()
@@ -1247,14 +1349,26 @@ class GameLogic:
 	def init_level(self):
 		self.level = self.levels[self.levelnum](self.ec, self)
 
+	def restart_level(self, text):
+		self.level = self.levels[self.levelnum](self.ec, self)
+		self.scenes[-1] = self.level
+		failure = SceneFailure(self.ec, text, self)
+		self.scenes.append(failure)
+
+	def pop_scene(self):
+		self.scenes.pop()
+
+
 
 # SVT = Sistema de viajes temporales
 class SVT:
-	def __init__(self, om, eventd, cam):
+	def __init__(self, om, eventd, cam, level):
 		self.recordlist = []	#Grabaciones por personaje
 		self.clonelist = []		#Clones al encender las máquinas
 		self.blocklist = []		#Máquinas que han de bloquearse
 
+		self.i = -1
+		self.level = level
 		self.om = om
 		self.eventd = eventd
 		self.cam = cam
@@ -1281,6 +1395,15 @@ class SVT:
 				if last == None: last = t
 				elif last[4] < t[4]:
 					last = t
+		return last
+
+	def find_last_clone(self):
+		'Encuentra la última clonación producida por cualquier máquina'
+		last = None
+		for t in self.clonelist:
+			if last == None: last = t
+			elif last[4] < t[4]:
+				last = t
 		return last
 
 	def find_boy(self, boy):
@@ -1501,105 +1624,149 @@ class SVT:
 		#Block machine by the boy who activated in the past
 		self.block_machine(rec)
 
+	def restart_level(self, rel_t, code):
+		'Boy has died. Restart level'
+		print('svt:\t\tsomething bad occurred :(')
 
-class Game:
+		d = {}
+		d['code'] = code
+		ev = pygame.event.Event(pygame.USEREVENT, d)
+		self.eventd.event_to(ev, self, self.level, rel_t)
 
-	def level_test(self, t, eventd, camera, om, svt):
-		w0 = Wall((-50, 0), (400, 1), camera)
-		om.add_wall(w0)
 
-		w1 = Wall((50, 50), (200, 1), camera)
-		om.add_wall(w1)
+#		# Find boy rec and restart it
+#		rec_entry = self.find_boy(boy)
+#		rec = rec_entry[1]
+#
+#		clone_entry = self.find_last_clone()
+#		# Al menos ha de existir la primera clonación hecha por MachineStart
+#		if clone_entry == None:
+#			print('svt:\t\tno clones found. BUG')
+#			sys.exit()
+#
+#		tm = clone_entry
+#		tb = rec_entry
+#
+#		oldboy = tb[0]
+#		machine = tm[0]
+#		oldrec = tb[1]
+#		start = tm[2]
+#
+#		self.travel(rel_t, start)
+#
+#		self.om.disable_boys()
+#
+#		print('svt:\t\trestoring previous clone')
+#		#print(str(tm[1]))
+#		self.om.restore(tm[1])
+#
+#		self.rec_play(start)
+#
+#		#Reset the recording for the active boy
+#		rec.restart(rel_t)
+#
+#		#Bloquear la máquina. Si es MachineStart no se bloqueará
+#		self.block_machine(rec)
 
-		w2 = Wall((350+40, 0), (200, 1), camera)
-		om.add_wall(w2)
 
-		m0 = Machine(t, eventd, camera, svt)
-		m0.set_position(100, 0)
-		om.add(m0)
-
-		m1 = Machine(t, eventd, camera, svt)
-		m1.set_position(200, 0)
-		om.add(m1)
-
-		m2 = Machine(t, eventd, camera, svt)
-		m2.set_position(300, 0)
-		om.add(m2)
-
-		m3 = Machine(t, eventd, camera, svt)
-		m3.set_position(500, 0)
-		om.add(m3)
-
-		lb0 = LeverButton((70, 0), eventd, camera, svt, om)
-		om.add(lb0)
-
-		b0 = Boy(t, eventd, camera, svt, om)
-		b0.set_position(0, 0)
-		om.add(b0)
-
-		camera.follow(b0)
-		b0.activate(t)
-
-	def level1(self, t, eventd, camera, om, svt):
-		w0 = Wall((-50, 0), (100, 1), camera)
-		om.add_wall(w0)
-
-		w1 = Wall((150, 0), (50, 1), camera)
-		om.add_wall(w1)
-
-		m0 = Machine(t, eventd, camera, svt)
-		m0.set_position(-7, 0)
-		om.add(m0)
-
-		m1 = MachineExit((180, 0), camera, eventd)
-		om.add(m1)
-
-		ps0 = PlatformSimple((80, 0), (40, 1), camera)
-		om.add_wall(ps0)
-
-		lb0 = LeverButton((-30, 0), eventd, camera, svt, om)
-		lb0.set_target(ps0)
-		om.add(lb0)
-
-		b0 = Boy(t, eventd, camera, svt, om)
-		b0.set_position(0, 0)
-		om.add(b0)
-
-		camera.follow(b0)
-		b0.activate(t)
-
-	def play(self):
-		#t = time.perf_counter()
-		frame = 0
-		t = frame
-		clock = pygame.time.Clock()
-		om = ObjectManager()
-		eventctrl = EventControl()
-		eventd = EventDaemon(eventctrl, om)
-		camera = Camera()
-		svt = SVT(om, eventd, camera)
-		eventd.set_svt(svt)
-		om.set_eventd(eventd)
-
-		self.level1(t, eventd, camera, om, svt)
-
-		while True:
-			#print("-- Loop start --")
-
-			#t = time.perf_counter()
-			t = frame
-
-			screen.fill((0, 0, 0))
-
-			svt.update(t)
-
-			pygame.display.update()
-			pygame.display.flip()
-
-			#print("-- Loop end --")
-
-			clock.tick(50)
-			frame += 1
+#class Game:
+#
+#	def level_test(self, t, eventd, camera, om, svt):
+#		w0 = Wall((-50, 0), (400, 1), camera)
+#		om.add_wall(w0)
+#
+#		w1 = Wall((50, 50), (200, 1), camera)
+#		om.add_wall(w1)
+#
+#		w2 = Wall((350+40, 0), (200, 1), camera)
+#		om.add_wall(w2)
+#
+#		m0 = Machine(t, eventd, camera, svt)
+#		m0.set_position(100, 0)
+#		om.add(m0)
+#
+#		m1 = Machine(t, eventd, camera, svt)
+#		m1.set_position(200, 0)
+#		om.add(m1)
+#
+#		m2 = Machine(t, eventd, camera, svt)
+#		m2.set_position(300, 0)
+#		om.add(m2)
+#
+#		m3 = Machine(t, eventd, camera, svt)
+#		m3.set_position(500, 0)
+#		om.add(m3)
+#
+#		lb0 = LeverButton((70, 0), eventd, camera, svt, om)
+#		om.add(lb0)
+#
+#		b0 = Boy(t, eventd, camera, svt, om)
+#		b0.set_position(0, 0)
+#		om.add(b0)
+#
+#		camera.follow(b0)
+#		b0.activate(t)
+#
+#	def level1(self, t, eventd, camera, om, svt):
+#		w0 = Wall((-50, 0), (100, 1), camera)
+#		om.add_wall(w0)
+#
+#		w1 = Wall((150, 0), (50, 1), camera)
+#		om.add_wall(w1)
+#
+#		m0 = Machine(t, eventd, camera, svt)
+#		m0.set_position(-7, 0)
+#		om.add(m0)
+#
+#		m1 = MachineExit((180, 0), camera, eventd)
+#		om.add(m1)
+#
+#		ps0 = PlatformSimple((80, 0), (40, 1), camera)
+#		om.add_wall(ps0)
+#
+#		lb0 = LeverButton((-30, 0), eventd, camera, svt, om)
+#		lb0.set_target(ps0)
+#		om.add(lb0)
+#
+#		b0 = Boy(t, eventd, camera, svt, om)
+#		b0.set_position(0, 0)
+#		om.add(b0)
+#
+#		camera.follow(b0)
+#		b0.activate(t)
+#
+#	def play(self):
+#		#t = time.perf_counter()
+#		frame = 0
+#		t = frame
+#		clock = pygame.time.Clock()
+#		om = ObjectManager()
+#		eventctrl = EventControl()
+#		eventd = EventDaemon(eventctrl, om)
+#		camera = Camera()
+#		svt = SVT(om, eventd, camera)
+#		eventd.set_svt(svt)
+#		om.set_eventd(eventd)
+#
+#		self.level1(t, eventd, camera, om, svt)
+#
+#		while True:
+#			#print("-- Loop start --")
+#
+#			#t = time.perf_counter()
+#			t = frame
+#
+#			screen.fill((0, 0, 0))
+#
+#			svt.update(t)
+#
+#			pygame.display.update()
+#			pygame.display.flip()
+#
+#			#print("-- Loop end --")
+#
+#			clock.tick(50)
+#			frame += 1
 
 
 pygame.init()
