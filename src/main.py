@@ -1177,7 +1177,7 @@ class Camera:
 		#print('Camera obj relative to '+str(self.obj_coord))
 		#print('Camera screen center '+str((wm, hm)))
 		cx = wm - rx - wb/2
-		cy = hm - 0*ry - hb/2
+		cy = hm - 0 * ry - hb/2
 
 		self.camera = (int(cx), int(cy))
 		#print('camera:\t\tupdate')
@@ -1246,6 +1246,31 @@ class Level(Scene):
 		self.svt.update(self.frame)
 		self.frame += 1
 
+	def event(self, e, rel_t, from_obj):
+		print('level:\t\tevent from obj{}'.format(from_obj.i))
+
+		if e.type != pygame.USEREVENT:
+			print('level1:\t\tignoring no user event')
+			return False
+
+		#Receive exit event from MachineExit
+		if(e.code == EVENTCODE_OFF):
+			print('level1:\t\tevent off received: level complete')
+			self.logic.next_level()
+			return True
+		elif(e.code == EVENTCODE_DIE):
+			print('level1:\t\tevent die received, restarting level')
+			self.logic.restart_level('Has muerto.')
+		elif(e.code == EVENTCODE_COLLIDE):
+			print('level1:\t\tevent collide received, restarting level')
+			self.logic.restart_level('Has colisionado con tu clon.')
+		elif(e.code == EVENTCODE_INCOHERENCE):
+			print('level1:\t\tevent incoherence received, restarting level')
+			self.logic.restart_level('Has alterado el pasado.')
+
+		# End level, and go to the next.
+		return True
+
 class Level1(Level):
 	def __init__(self, ec, logic):
 		Level.__init__(self, ec, logic)
@@ -1286,37 +1311,61 @@ class Level1(Level):
 		self.camera.follow(b0)
 		b0.activate(t)
 
-	def event(self, e, rel_t, from_obj):
-		print('level1:\t\tevent from obj{}'.format(from_obj.i))
+class Level2(Level):
+	def __init__(self, ec, logic):
+		Level.__init__(self, ec, logic)
 
-		if e.type != pygame.USEREVENT:
-			print('level1:\t\tignoring no user event')
-			return False
+		#Frame set at Level
+		t = self.frame
 
-		#Receive exit event from MachineExit
-		if(e.code == EVENTCODE_OFF):
-			print('level1:\t\tevent off received: level complete')
-			self.logic.next_level()
-			return True
-		elif(e.code == EVENTCODE_DIE):
-			print('level1:\t\tevent die received, restarting level')
-			self.logic.restart_level('Has muerto.')
-		elif(e.code == EVENTCODE_COLLIDE):
-			print('level1:\t\tevent collide received, restarting level')
-			self.logic.restart_level('Has colisionado con tu clon.')
-		elif(e.code == EVENTCODE_INCOHERENCE):
-			print('level1:\t\tevent incoherence received, restarting level')
-			self.logic.restart_level('Has alterado el pasado.')
+		w0 = Wall((0, 0), (200, 1), self.camera)
+		self.om.add_wall(w0)
 
-		# End level, and go to the next.
-		return True
+		w1 = Wall((450, 0), (100, 1), self.camera)
+		self.om.add_wall(w1)
+
+		m0 = Machine(t, self.eventd, self.camera, self.svt)
+		m0.set_position(100-7, 0)
+		self.om.add(m0)
+
+		#Save reference on exit machine for compare later
+		self.m1 = MachineExit((500, 0), self.camera, self.eventd, self)
+		self.om.add(self.m1)
+
+		self.m2 = MachineStart(t, self.eventd, self.camera, self.svt)
+		self.m2.set_position(150-7, 0)
+		self.om.add(self.m2)
+
+		ps0 = PlatformSimple((250, 0), (50, 1), self.camera)
+		self.om.add(ps0)
+		self.om.add_wall(ps0)
+
+		lb0 = LeverButton((50, 0), self.eventd, self.camera, self.svt, self.om)
+		lb0.set_target(ps0)
+		self.om.add(lb0)
+
+		ps1 = PlatformSimple((350, 0), (50, 1), self.camera)
+		self.om.add(ps1)
+		self.om.add_wall(ps1)
+
+		lb1 = LeverButton((70, 0), self.eventd, self.camera, self.svt, self.om)
+		lb1.set_target(ps1)
+		self.om.add(lb1)
+
+		b0 = Boy(t, self.eventd, self.camera, self.svt, self.om)
+		b0.set_position(150, 0)
+		self.om.add(b0)
+
+		self.camera.follow(b0)
+		b0.activate(t)
+
 
 
 class GameLogic:
 	def __init__(self):
 		self.ec = EventControl()
 		self.exit = False
-		self.levels = [Level1, Level1]
+		self.levels = [Level1, Level2]
 		self.levelnum = 0
 		self.level = None
 		self.scenes = []
@@ -1462,9 +1511,10 @@ class SVT:
 
 	def print_time(self, rel_t):
 		w, h = screen.get_size()
-		label = font_time.render(str(int(rel_t/FPS)), 1, (100,100,100))
+		timestr = "%0.1f" % (rel_t/FPS)
+		label = font_time.render(timestr, 1, (100,100,100))
 #		screen.blit(label, (280, 30))
-		screen.blit(label, (w/2-label.get_width()/2, h-20-label.get_height()/2))
+		screen.blit(label, (w/2-30, h-20-label.get_height()/2))
 
 	def enable_machines(self, m):
 		'Activa todas las máquinas excepto la actual'
@@ -1778,7 +1828,7 @@ class SVT:
 
 
 pygame.init()
-font_time = pygame.font.SysFont("terminus", 30)
+font_time = pygame.font.SysFont("Ubuntu Mono", 30)
 terminus = pygame.font.SysFont("terminus", 16)
 screen = pygame.display.set_mode((320*2, 240*2))
 
