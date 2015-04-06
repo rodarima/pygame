@@ -262,6 +262,23 @@ class Wall(pygame.sprite.Sprite, Collider):
 	#def clone(self): return None
 	#def restore(self, d): pass
 
+class LogicConector:
+	'Send every input event to all output objects'
+	def __init__(self):
+		self.inlist = []
+		self.outlist = []
+
+	def event(self, e, rel_t, from_obj):
+		if not (from_obj in self.inlist): return False
+
+		for obj in self.outlist:
+			obj.event(e, rel_t, from_obj)
+
+	def add_in(self, obj):
+		self.inlist.append(obj)
+
+	def add_out(self, obj):
+		self.outlist.append(obj)
 
 
 class LeverButton(pygame.sprite.Sprite):
@@ -509,7 +526,7 @@ class Gravity:
 				self.ay = self.g
 				print('obj{}:\t\tfalling at t={}'.format(self.i, rel_t))
 				self.falling = True
-			print('obj{}:\t\tfalling vy={}'.format(self.i, self.vy))
+#			print('obj{}:\t\tfalling vy={}'.format(self.i, self.vy))
 #TODO: Atrapar caída sólo si la base se encuentra por debajo, y ha pasado por
 #encima de las esquinas del suelo
 		elif self.falling and self.vy < 0:
@@ -1336,7 +1353,7 @@ class Level2(Level):
 		self.m2.set_position(150-7, 0)
 		self.om.add(self.m2)
 
-		ps0 = PlatformSimple((250, 0), (50, 1), self.camera)
+		ps0 = PlatformSimple((250-20, 0), (50+40, 1), self.camera)
 		self.om.add(ps0)
 		self.om.add_wall(ps0)
 
@@ -1344,7 +1361,7 @@ class Level2(Level):
 		lb0.set_target(ps0)
 		self.om.add(lb0)
 
-		ps1 = PlatformSimple((350, 0), (50, 1), self.camera)
+		ps1 = PlatformSimple((350-20, 0), (50+40, 1), self.camera)
 		self.om.add(ps1)
 		self.om.add_wall(ps1)
 
@@ -1359,13 +1376,160 @@ class Level2(Level):
 		self.camera.follow(b0)
 		b0.activate(t)
 
+class Level3(Level):
+	def __init__(self, ec, logic):
+		Level.__init__(self, ec, logic)
+
+		#Frame set at Level
+		t = self.frame
+
+		# Walls
+		w0 = Wall((0, 0), (50, 1), self.camera)
+		self.om.add_wall(w0)
+
+		w1 = Wall((150, 0), (125, 1), self.camera)
+		self.om.add_wall(w1)
+
+#		w2 = Wall((300, 0), (50, 1), self.camera)
+#		self.om.add_wall(w2)
+
+		w3 = Wall((375, 0), (50, 1), self.camera)
+		self.om.add_wall(w3)
+
+		w4 = Wall((525, 0), (50, 1), self.camera)
+		self.om.add_wall(w4)
+
+
+		#Machines
+		m1 = Machine(t, self.eventd, self.camera, self.svt)
+		m1.set_position(0-7, 0)
+		self.om.add(m1)
+
+		m0 = Machine(t, self.eventd, self.camera, self.svt)
+		m0.set_position(250-7, 0)
+		self.om.add(m0)
+
+		#Exit machine
+		self.m1 = MachineExit((550-7, 0), self.camera, self.eventd, self)
+		self.om.add(self.m1)
+
+		#Start machine
+		self.m2 = MachineStart(t, self.eventd, self.camera, self.svt)
+		self.m2.set_position(200-7, 0)
+		self.om.add(self.m2)
+
+		#Platforms
+		ps0 = PlatformSimple((75, 0), (50, 1), self.camera)
+		self.om.add(ps0)
+		self.om.add_wall(ps0)
+
+		ps1 = PlatformSimple((300, 0), (50, 1), self.camera)
+		self.om.add(ps1)
+		self.om.add_wall(ps1)
+
+		ps2 = PlatformSimple((450, 0), (50, 1), self.camera)
+		self.om.add(ps2)
+		self.om.add_wall(ps2)
+
+		#Levers
+		lc0 = LogicConector()
+
+		lb0 = LeverButton((175, 0), self.eventd, self.camera, self.svt, self.om)
+		lb0.set_target(lc0)
+		self.om.add(lb0)
+
+		lc0.add_in(lb0)
+		lc0.add_out(ps0)
+		lc0.add_out(ps1)
+
+		lb1 = LeverButton((400, 0), self.eventd, self.camera, self.svt, self.om)
+		lb1.set_target(ps2)
+		self.om.add(lb1)
+
+		#Boy
+		b0 = Boy(t, self.eventd, self.camera, self.svt, self.om)
+		b0.set_position(200, 0)
+		self.om.add(b0)
+
+		self.camera.follow(b0)
+		b0.activate(t)
+
+
+class Level4(Level):
+	def __init__(self, ec, logic):
+		Level.__init__(self, ec, logic)
+
+		#Frame set at Level
+		t = self.frame
+
+		# Walls
+		w0 = Wall((0, 0), (300, 1), self.camera)
+		self.om.add_wall(w0)
+
+		w1 = Wall((525, 150), (50, 1), self.camera)
+		self.om.add_wall(w1)
+
+		m0 = Machine(t, self.eventd, self.camera, self.svt)
+		m0.set_position(200-7, 0)
+		self.om.add(m0)
+
+		#Exit machine
+		me = MachineExit((550-7, 150), self.camera, self.eventd, self)
+		self.om.add(me)
+
+		#Start machine
+		ms = MachineStart(t, self.eventd, self.camera, self.svt)
+		ms.set_position(150-7, 0)
+		self.om.add(ms)
+
+		#Platforms
+		ps0 = PlatformSimple((325, 50), (75, 1), self.camera)
+		self.om.add(ps0)
+		self.om.add_wall(ps0)
+
+		ps1 = PlatformSimple((375, 100), (75, 1), self.camera)
+		self.om.add(ps1)
+		self.om.add_wall(ps1)
+
+		ps2 = PlatformSimple((425, 50), (75, 1), self.camera)
+		self.om.add(ps2)
+		self.om.add_wall(ps2)
+
+		ps3 = PlatformSimple((475, 100), (75, 1), self.camera)
+		self.om.add(ps3)
+		self.om.add_wall(ps3)
+
+#		#Levers
+		lb0 = LeverButton((25, 0), self.eventd, self.camera, self.svt, self.om)
+		lb0.set_target(ps0)
+		self.om.add(lb0)
+
+		lb1 = LeverButton((50, 0), self.eventd, self.camera, self.svt, self.om)
+		lb1.set_target(ps1)
+		self.om.add(lb1)
+
+		lb2 = LeverButton((75, 0), self.eventd, self.camera, self.svt, self.om)
+		lb2.set_target(ps2)
+		self.om.add(lb2)
+
+		lb3 = LeverButton((100, 0), self.eventd, self.camera, self.svt, self.om)
+		lb3.set_target(ps3)
+		self.om.add(lb3)
+
+		#Boy
+		b0 = Boy(t, self.eventd, self.camera, self.svt, self.om)
+		b0.set_position(150, 0)
+		self.om.add(b0)
+
+		self.camera.follow(b0)
+		b0.activate(t)
 
 
 class GameLogic:
 	def __init__(self):
 		self.ec = EventControl()
 		self.exit = False
-		self.levels = [Level1, Level2]
+		self.levels = [Level1, Level2, Level3, Level4]
 		self.levelnum = 0
 		self.level = None
 		self.scenes = []
