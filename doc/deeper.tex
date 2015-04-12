@@ -135,7 +135,7 @@ dentro, la máquina te transporta al pasado, en el momento exacto en el que se
 encendió, cuando te encontrabas desayunando en la cafetería. Tras viajar, el 
 número que se te había asignado, ha aumentado. Ahora tu número es el 2.  
 Entonces te diriges a la cafetería. Allí, tu versión 1 se encontrará desayunando 
-y decides sentarse muy alejado.
+y decides sentarte muy alejado.
 
 Mientras desayunabas, siendo 1, no pensabas en absoluto que tú mismo estuvieras 
 ahí en la cafetería, pues fue una decisión que tomaste despues. El efecto de 
@@ -339,7 +339,10 @@ pulsadores, de forma que al soltarlas o al alejarse vuelven a la posición
 original.
 
 Esta propiedad fuerza a que para mantener los efectos de la palanca durante un 
-intervalo, sea necesario mantenerla durante ese intervalo.
+intervalo, sea necesario mantenerla activada durante ese intervalo.
+
+Las palancas envían eventos dirigidos a otro objeto, para activarlo o
+desactivarlo. Normalmente a una plataforma.
 
 \subsubsection{Plataformas}
 El juego se basa en la activación de plataformas, mediante las palancas, que 
@@ -383,7 +386,7 @@ filtrarlos. Además si se presiona la tecla de salir, inmediatamente cierra el
 juego.
 
 Se utiliza una sóla instancia compartida en todos los niveles para poder obtener 
-los eventos de teclados. Posteriormente se redirige tanto al jugador activo, 
+los eventos de teclado. Posteriormente se redirige tanto al jugador activo, 
 como a las escenas de pausa.
 
 \subsubsection{LogicConnector}
@@ -495,7 +498,7 @@ Adicionalemente, uno de los problemas de viajar en el tiempo en un entorno
 simulado, es que sólo se puede actualizar un eje temporal a la vez.
 
 Quizás en una interpretación de los viajes en el tiempo más realista, un viaje 
-en el tiempo sí permitiría la alteración del pasado. Sin embargo es dificil de 
+en el tiempo sí permitiría la alteración del pasado. Sin embargo es difícil de 
 realizar en un juego. Por ello se incluyen los bloqueos anteriormente 
 mencionados. Sin ellos, la coherencia del mundo no está garantizada.
 
