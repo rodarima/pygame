@@ -1,9 +1,9 @@
+# Encoding: utf-8
+
 #
 # Copyright (c) 2015 Rodrigo Arias
 # Distributed under the GNU GPL v3. For full terms see the file LICENSE.
 #
-
-# Encoding: utf-8
 
 from __future__ import division
 import sys, pygame, time, os
@@ -1243,6 +1243,26 @@ class SceneStart(Scene):
 				self.logic.pop_scene()
 				break
 
+class SceneEnd(Scene):
+	def __init__(self, ec, logic):
+		Scene.__init__(self, ec)
+		self.logic = logic
+		self.img = SpriteT.load_image(self, "../img/win.png")
+		print 'SceneEnd'
+
+	def update(self):
+		screen.fill((0, 0, 0))
+
+		screen.blit(self.img, (0, 0))
+
+		self.ec.dispatch()
+		l = self.ec.get_keyboard()
+		for e in l:
+			if e.type == pygame.KEYDOWN:
+				self.logic.pop_scene()
+				break
+
+
 class SceneControls(Scene):
 	def __init__(self, ec, logic):
 		Scene.__init__(self, ec)
@@ -1324,13 +1344,13 @@ class Level(Scene):
 			return True
 		elif(e.code == EVENTCODE_DIE):
 			print 'level1:\t\tevent die received, restarting level'
-			self.logic.restart_level('Has muerto.')
+			self.logic.restart_level('Has muerto. Pulsa espacio.')
 		elif(e.code == EVENTCODE_COLLIDE):
 			print 'level1:\t\tevent collide received, restarting level'
-			self.logic.restart_level('Has colisionado con tu clon.')
+			self.logic.restart_level('Has colisionado con tu clon. Pulsa espacio.')
 		elif(e.code == EVENTCODE_INCOHERENCE):
 			print 'level1:\t\tevent incoherence received, restarting level'
-			self.logic.restart_level('Has alterado el pasado.')
+			self.logic.restart_level('Has alterado el pasado. Pulsa espacio.')
 
 		# End level, and go to the next.
 		return True
@@ -1695,7 +1715,9 @@ class GameLogic:
 
 		if(self.levelnum >= len(self.levels)):
 			print 'End of game!!'
-			sys.exit('')
+			# Remove actual level
+			self.pop_scene()
+			self.end_game()
 
 		print 'GameLogic starting level {}', self.levelnum+1
 
@@ -1715,6 +1737,13 @@ class GameLogic:
 
 	def pop_scene(self):
 		self.scenes.pop()
+
+	def end_game(self):
+		self.levelnum = 0
+		self.init_level()
+		self.scenes.append(self.level)
+#		self.scenes.append(SceneStart(self.ec, self))
+		self.scenes.append(SceneEnd(self.ec, self))
 
 
 
