@@ -1,4 +1,4 @@
-import sys, pygame, time
+import sys, pygame, time, os
 from pympler import asizeof
 from pygame import gfxdraw
 
@@ -14,6 +14,7 @@ EVENTCODE_DIE = 2
 EVENTCODE_COLLIDE = 3
 EVENTCODE_INCOHERENCE = 4
 EVENTCODE_PAUSE = 5
+EVENTCODE_RESET = 6
 
 MACHINE_OFF = 0
 MACHINE_TIMER0 = 1
@@ -23,6 +24,10 @@ MACHINE_ON = 3
 KEY_JUMP = pygame.K_UP
 KEY_ACTION = pygame.K_DOWN
 KEY_OK = pygame.K_SPACE
+
+# Center window
+os.environ['SDL_VIDEO_CENTERED'] = '1'
+
 
 class Recording():
 	""" Records events for auto-play """
@@ -262,7 +267,7 @@ class Wall(pygame.sprite.Sprite, Collider):
 	#def clone(self): return None
 	#def restore(self, d): pass
 
-class LogicConector:
+class LogicConnector:
 	'Send every input event to all output objects'
 	def __init__(self):
 		self.inlist = []
@@ -656,9 +661,6 @@ class Boy(SpriteT, Gravity):
 		if self.vy < -30*FPS/50:
 			self.svt.level_event(t, EVENTCODE_DIE)
 		self.update_position(t)
-		if self.vx != 0:	fn = +1
-		else: fn = 0
-		self.frame(fn)
 		self.cam.update()
 		SpriteT.update(self, t)
 
@@ -680,6 +682,9 @@ class Boy(SpriteT, Gravity):
 #		name = terminus.render(str(self.i), 1, (255,0,0))
 #		screen.blit(name, (scr_pos[0]+5, scr_pos[1]-self.rect.h-15))
 
+		if self.vx != 0:	fn = +1
+		else: fn = 0
+		self.frame(fn)
 		screen.blit(self.surf, self.rect)
 
 	def update(self, t):
@@ -1216,6 +1221,45 @@ class Scene:
 		'Update all scene at each frame'
 		raise NotImplemented()
 
+class SceneStart(Scene):
+	def __init__(self, ec, logic):
+		Scene.__init__(self, ec)
+		self.logic = logic
+		self.img = SpriteT.load_image(self, "../img/title.png")
+		print('SceneStart')
+
+	def update(self):
+		screen.fill((0, 0, 0))
+
+		screen.blit(self.img, (0, 0))
+
+		self.ec.dispatch()
+		l = self.ec.get_keyboard()
+		for e in l:
+			if e.type == pygame.KEYDOWN:
+				self.logic.pop_scene()
+				break
+
+class SceneControls(Scene):
+	def __init__(self, ec, logic):
+		Scene.__init__(self, ec)
+		self.logic = logic
+		self.img = SpriteT.load_image(self, "../img/controls.png")
+		print('SceneControls')
+
+	def update(self):
+		screen.fill((0, 0, 0))
+
+		screen.blit(self.img, (0, 0))
+
+		self.ec.dispatch()
+		l = self.ec.get_keyboard()
+		for e in l:
+			if e.type == pygame.KEYDOWN:
+				self.logic.pop_scene()
+				break
+
+
 class SceneFailure(Scene):
 	def __init__(self, ec, text, logic):
 		Scene.__init__(self, ec)
@@ -1234,7 +1278,7 @@ class SceneFailure(Scene):
 
 		screen.blit(s, (0, 0))
 
-		label = font_time.render(self.text, 1, (100,100,100))
+		label = font_title.render(self.text, 1, (100,100,100))
 		screen.blit(label, (w/2-label.get_width()/2, sh/2-label.get_height()/2))
 
 		self.ec.dispatch()
@@ -1432,7 +1476,7 @@ class Level3(Level):
 		self.om.add_wall(ps2)
 
 		#Levers
-		lc0 = LogicConector()
+		lc0 = LogicConnector()
 
 		lb0 = LeverButton((175, 0), self.eventd, self.camera, self.svt, self.om)
 		lb0.set_target(lc0)
@@ -1525,16 +1569,105 @@ class Level4(Level):
 		b0.activate(t)
 
 
+class Level5(Level):
+	def __init__(self, ec, logic):
+		Level.__init__(self, ec, logic)
+
+		#Frame set at Level
+		t = self.frame
+
+		# Walls
+		self.om.add_wall(Wall((0, 150), (50, 1), self.camera))
+		self.om.add_wall(Wall((225, 0), (100, 1), self.camera))
+		self.om.add_wall(Wall((400, 0), (100, 1), self.camera))
+		self.om.add_wall(Wall((575, 100), (50, 1), self.camera))
+
+
+		# Machines
+		m0 = Machine(t, self.eventd, self.camera, self.svt)
+		m0.set_position(450-7, 0)
+		self.om.add(m0)
+
+		m1 = Machine(t, self.eventd, self.camera, self.svt)
+		m1.set_position(225-7, 0)
+		self.om.add(m1)
+
+		m2 = Machine(t, self.eventd, self.camera, self.svt)
+		m2.set_position(0-7, 150)
+		self.om.add(m2)
+
+		#Exit machine
+		me = MachineExit((600-7, 100), self.camera, self.eventd, self)
+		self.om.add(me)
+
+		#Start machine
+		ms = MachineStart(t, self.eventd, self.camera, self.svt)
+		ms.set_position(475-7, 0)
+		self.om.add(ms)
+
+		#Platforms
+		ps0 = PlatformSimple((75, 150), (25, 1), self.camera)
+		self.om.add(ps0)
+		self.om.add_wall(ps0)
+
+		ps1 = PlatformSimple((125, 100), (25, 1), self.camera)
+		self.om.add(ps1)
+		self.om.add_wall(ps1)
+
+		ps2 = PlatformSimple((175, 50), (25, 1), self.camera)
+		self.om.add(ps2)
+		self.om.add_wall(ps2)
+
+		ps3 = PlatformSimple((350, 0), (25, 1), self.camera)
+		self.om.add(ps3)
+		self.om.add_wall(ps3)
+
+		ps4 = PlatformSimple((525, 0), (25, 1), self.camera)
+		self.om.add(ps3)
+		self.om.add_wall(ps3)
+
+#		#Levers
+		lb0 = LeverButton((250, 0), self.eventd, self.camera, self.svt, self.om)
+		lb0.set_target(ps0)
+		self.om.add(lb0)
+
+		lb1 = LeverButton((265, 0), self.eventd, self.camera, self.svt, self.om)
+		lb1.set_target(ps1)
+		self.om.add(lb1)
+
+		lb2 = LeverButton((280, 0), self.eventd, self.camera, self.svt, self.om)
+		lb2.set_target(ps2)
+		self.om.add(lb2)
+
+		lb3 = LeverButton((425, 0), self.eventd, self.camera, self.svt, self.om)
+		lb3.set_target(ps3)
+		self.om.add(lb3)
+
+		lb4 = LeverButton((25, 150), self.eventd, self.camera, self.svt, self.om)
+		lb4.set_target(ps4)
+		self.om.add(lb4)
+
+		#Boy
+		b0 = Boy(t, self.eventd, self.camera, self.svt, self.om)
+		b0.set_position(475, 0)
+		self.om.add(b0)
+
+		self.camera.follow(b0)
+		b0.activate(t)
+
+
 class GameLogic:
 	def __init__(self):
 		self.ec = EventControl()
 		self.exit = False
-		self.levels = [Level1, Level2, Level3, Level4]
+		self.levels = [Level1, Level2, Level3, Level4, Level5]
 		self.levelnum = 0
 		self.level = None
 		self.scenes = []
 		self.init_level()
 		self.scenes.append(self.level)
+		self.scenes.append(SceneControls(self.ec, self))
+		self.scenes.append(SceneStart(self.ec, self))
 
 	def play(self):
 		clock = pygame.time.Clock()
@@ -1994,6 +2127,7 @@ class SVT:
 pygame.init()
 font_time = pygame.font.SysFont("Ubuntu Mono", 30)
 terminus = pygame.font.SysFont("terminus", 16)
+font_title = pygame.font.SysFont("Sans Serif", 30)
 screen = pygame.display.set_mode((320*2, 240*2))
 
 
