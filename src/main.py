@@ -1,5 +1,8 @@
+
+# Encoding: utf-8
+
+from __future__ import division
 import sys, pygame, time, os
-from pympler import asizeof
 from pygame import gfxdraw
 
 FPS = 50
@@ -59,35 +62,33 @@ class Recording():
 		if(self.state != REC_RECORDING): return
 		tup = (t, e)
 		self.events.append(tup)
-		#print("Record event:" + str(tup))
+		#print "Record event:" + str(tup
 
 	def new_frame(self, t):
 		if(self.state != REC_RECORDING): return
 		self.diff_time = t - self.start_time
-		#print("Recording new frame, dif = " + str(self.diff_time))
+		#print "Recording new frame, dif = " + str(self.diff_time)
 
-	def print(self):
-		#print(asizeof.asizeof(self.events)/len(self.events))
+	def _print(self):
 		for e in self.events:
-			print(e)
+			print e
 
 	def get_all(self):
 		return [e[1] for e in self.events]
 
 	def play(self, play_start):
-#		print('Recording PLAY start = {0}'.format(play_start))
+#		print 'Recording PLAY start = {0}'.format(play_start)
 		if self.end_time < play_start:
 			self.state = REC_STOPPED
-			print('Recording STOPPED')
+			print 'Recording STOPPED'
 		elif self.start_time < play_start:
 			self.state = REC_PLAYING
-			print('Recording PLAYING')
+			print 'Recording PLAYING'
 		else:
 			self.state = REC_WAITING
-			print('Recording WAITING')
+			print 'Recording WAITING'
 		self.play_start = play_start
 		self.last_start = play_start
-		#self.print()
 
 	def finish(self, t):
 		self.state = REC_STOPPED
@@ -105,7 +106,7 @@ class Recording():
 
 		#TODO: WAITING -> PLAYING
 
-		#print('Recording GET')
+		#print 'Recording GET'
 		start_get = self.last_start
 		end_get = t
 		self.last_start = end_get
@@ -118,8 +119,8 @@ class Recording():
 		#if start_get > t:
 		#	return []
 
-#		print("start:"+str(start_get))
-#		print("end:"+str(end_get))
+#		print "start:"+str(start_get)
+#		print "end:"+str(end_get)
 
 		# "Premature optimization is the root of all evil" - Donald Knuth
 		#return [e[1] for e in self.events if e[0] >= start_get e[0] < end_get]
@@ -129,20 +130,20 @@ class Recording():
 			e = self.events[i]
 			if(e[0] > end_get and i == 0): break
 			if(e[0] >= start_get and start == -1):
-#				print("Got start:" + str(i))
+#				print "Got start:" + str(i)
 				start = i
 			if(e[0] < end_get and start != -1):
-#				print("Got end:" + str(i))
+#				print "Got end:" + str(i)
 				end = i
 			if(e[0] >= end_get and start != -1):
 				break
 			#if(start != -1 and end != -1):
 			#	break
 
-		#print(str(start) + " -> " + str(end))
+		#print str(start) + " -> " + str(end)
 		el = []
 		for e in self.events[start:end+1]:
-			#print("Replay event:" + str(e))
+			#print "Replay event:" + str(e)
 			el.append(e[1])
 		return el
 
@@ -165,8 +166,8 @@ class SpriteT(pygame.sprite.Sprite):
 	def update_position(self, t):
 		dif_t = t - self.last_time
 #		if dif_t > 1:
-#			print("ERROR: dif_t:" + str(dif_t) + ' en boy'+str(self.i))
-#			sys.exit()
+#			print "ERROR: dif_t:" + str(dif_t) + ' en boy'+str(self.i)
+#			sys.exit('BUG')
 		self.last_time = t
 		self.rx += self.vx * dif_t + (dif_t**2 * self.ax / 2)
 		self.ry += self.vy * dif_t + (dif_t**2 * self.ay / 2)
@@ -174,8 +175,9 @@ class SpriteT(pygame.sprite.Sprite):
 		self.vx += (dif_t * self.ax)
 		self.vy += (dif_t * self.ay)
 
-		#print('SpriteT absolute position ' + str((self.rx, self.ry)))
+		#print 'SpriteT absolute position ' + str((self.rx, self.ry))
 
+	@staticmethod
 	def load_image(self, f):
 		img = pygame.image.load(f)
 		img = img.convert()
@@ -207,8 +209,8 @@ class SpriteT(pygame.sprite.Sprite):
 		scr_pos = self.cam.get_screen_position(self.rx, self.ry)
 		self.rect.bottomleft = scr_pos
 
-		print('spriteT:\trestoring obj{} at ({}, {})'.format(
-			self.i, self.rx, self.ry))
+		print 'spriteT:\trestoring obj{} at ({}, {}'.format(
+			self.i, self.rx, self.ry)
 
 class BlockState():
 
@@ -324,7 +326,7 @@ class LeverButton(pygame.sprite.Sprite):
 		elif(self.state == self.LEVER_ON and self.frame != self.frames-1):
 			self.frame += 1
 
-		#print('leverbutton{}:\tframe = {}'.format(self.i, self.frame))
+		#print 'leverbutton{}:\tframe = {}'.format(self.i, self.frame)
 
 		self.surf = self.img.subsurface(
 			self.frame * self.imgw + self.imgx,
@@ -352,46 +354,46 @@ class LeverButton(pygame.sprite.Sprite):
 		if self.boy == None:
 			self.boy = from_obj
 			self.state = self.LEVER_ON
-			print('leverbutton{}:\tboy{} pulls the lever'.format(
-				self.i, self.boy.i))
+			print 'leverbutton{}:\tboy{} pulls the lever'.format(
+				self.i, self.boy.i)
 		elif self.boy == self.eventd.active_boy:
-			print('leverbutton{}:\taltered past detected'.format(
-				self.i))
-			print('leverbutton{}:\tboy{} wants to change state'.format(
-				self.i, from_obj.i))
+			print 'leverbutton{}:\taltered past detected'.format(
+				self.i)
+			print 'leverbutton{}:\tboy{} wants to change state'.format(
+				self.i, from_obj.i)
 			self.svt.level_event(t, EVENTCODE_INCOHERENCE)
 		else:
-			print('leverbutton{}:\tignoring event from unknown boy{}'.format(
-				self.i, from_obj.i))
+			print 'leverbutton{}:\tignoring event from unknown boy{}'.format(
+				self.i, from_obj.i)
 			return False
 
 	def release(self, t, from_obj):
 		if self.boy != from_obj:
 #			if self.boy == self.eventd.active_boy:
-#				print('leverbutton{}:\taltered past detected'.format(
-#					self.i))
-#				print('leverbutton{}:\tboy{} wants to change state'.format(
-#					self.i, from_obj.i))
-#				sys.exit()
+#				print 'leverbutton{}:\taltered past detected'.format(
+#					self.i)
+#				print 'leverbutton{}:\tboy{} wants to change state'.format(
+#					self.i, from_obj.i)
+#				sys.exit('BUG')
 #			else:
-			print('leverbutton{}:\tignoring event from unknown boy{}'.format(
-				self.i, from_obj.i))
+			print 'leverbutton{}:\tignoring event from unknown boy{}'.format(
+				self.i, from_obj.i)
 			return False
 		elif self.boy == from_obj:
-			print('leverbutton{}:\tboy{} releases the lever'.format(
-				self.i, self.boy.i))
+			print 'leverbutton{}:\tboy{} releases the lever'.format(
+				self.i, self.boy.i)
 			self.boy = None
 			self.state = self.LEVER_OFF
 
 	def event(self, e, rel_t, from_obj):
-		print('leverbutton{}:\tevent at t={}'.format(self.i, rel_t))
+		print 'leverbutton{}:\tevent at t={}'.format(self.i, rel_t)
 
 		if e.key != KEY_ACTION:
-			print('leverbutton{}:\tignoring unknown key'.format(self.i))
+			print 'leverbutton{}:\tignoring unknown key'.format(self.i)
 			return False
 
 		if not isinstance(from_obj, Boy):
-			print('leverbutton{}:\tevent not from boy'.format(self.i))
+			print 'leverbutton{}:\tevent not from boy'.format(self.i)
 			return False
 
 
@@ -400,11 +402,11 @@ class LeverButton(pygame.sprite.Sprite):
 		elif e.type == pygame.KEYUP:
 			self.release(rel_t, from_obj)
 		else:
-			print('leverbutton{}:\tignoring unknown event type'.format(self.i))
+			print 'leverbutton{}:\tignoring unknown event type'.format(self.i)
 			return False
 
 
-		print('leverbutton{}:\tstate now {}'.format(self.i, self.state))
+		print 'leverbutton{}:\tstate now {}'.format(self.i, self.state)
 		#TODO: Solo enviar acción cuando realmente hace falta
 		self.action(rel_t)
 
@@ -413,9 +415,9 @@ class LeverButton(pygame.sprite.Sprite):
 	def collide_boy(self, rel_t):
 		lobj = self.om.collide(self)
 		if(self.boy not in lobj):
-			print('leverbutton{}:\tboy{} leaving'.format(self.i, self.boy.i))
-			print('leverbutton{}:\tboy{} at {},{}'.format(
-				self.i, self.boy.i, self.boy.rx,self.boy.ry))
+			print 'leverbutton{}:\tboy{} leaving'.format(self.i, self.boy.i)
+			print 'leverbutton{}:\tboy{} at {},{}'.format(
+				self.i, self.boy.i, self.boy.rx,self.boy.ry)
 			self.boy = None
 			self.state = self.LEVER_OFF
 			self.action(rel_t)
@@ -446,8 +448,8 @@ class LeverButton(pygame.sprite.Sprite):
 		self.frame = d['frame']
 		self.state = d['state']
 		self.boy = d['boy']
-		print('leverbutton{}:\trestoring state {}'.format(self.i, self.state))
-#		print('leverbutton{}:\trestoring state {}'.format(self.i, self.frame))
+		print 'leverbutton{}:\trestoring state {}'.format(self.i, self.state)
+#		print 'leverbutton{}:\trestoring state {}'.format(self.i, self.frame)
 
 class PlatformSimple(pygame.sprite.Sprite, Collider):
 
@@ -471,25 +473,25 @@ class PlatformSimple(pygame.sprite.Sprite, Collider):
 			return pygame.sprite.collide_rect(obj, self)
 
 	def event(self, e, rel_t, from_obj):
-		print('platform{}:\tevent at t={}'.format(self.i, rel_t))
+		print 'platform{}:\tevent at t={}'.format(self.i, rel_t)
 
 		if e.type != pygame.USEREVENT:
-			print('platform{}:\tignoring no user event'.format(self.i))
+			print 'platform{}:\tignoring no user event'.format(self.i)
 			return False
 
-		print('platform{}:\tevent:'.format(self.i))
-		print(str(e))
+		print 'platform{}:\tevent:'.format(self.i)
+		print str(e)
 
 		if e.code == EVENTCODE_OFF:
 			self.state = self.PLATFORM_INACTIVE
 		elif e.code == EVENTCODE_ON:
 			self.state = self.PLATFORM_ACTIVE
 		else:
-			print('platform{}:\tignoring unknown event code'.format(self.i))
+			print 'platform{}:\tignoring unknown event code'.format(self.i)
 			return False
 
 
-		print('platform{}:\tstate now {}'.format(self.i, self.state))
+		print 'platform{}:\tstate now {}'.format(self.i, self.state)
 
 		return True
 
@@ -513,7 +515,7 @@ class PlatformSimple(pygame.sprite.Sprite, Collider):
 
 	def restore(self, d):
 		self.state = d['state']
-		print('platform{}:\tstate after restore {}'.format(self.i, self.state))
+		print 'platform{}:\tstate after restore {}'.format(self.i, self.state)
 
 class Gravity:
 	def __init__(self, om):
@@ -529,14 +531,14 @@ class Gravity:
 		if max_y == None:
 			if not self.falling:
 				self.ay = self.g
-				print('obj{}:\t\tfalling at t={}'.format(self.i, rel_t))
+				print 'obj{}:\t\tfalling at t={}'.format(self.i, rel_t)
 				self.falling = True
-#			print('obj{}:\t\tfalling vy={}'.format(self.i, self.vy))
+#			print 'obj{}:\t\tfalling vy={}'.format(self.i, self.vy)
 #TODO: Atrapar caída sólo si la base se encuentra por debajo, y ha pasado por
 #encima de las esquinas del suelo
 		elif self.falling and self.vy < 0:
-			print('obj{}:\t\tfalling ry={}'.format(self.i, self.ry))
-			print('obj{}:\t\tstop falling max_y={}'.format(self.i, max_y))
+			print 'obj{}:\t\tfalling ry={}'.format(self.i, self.ry)
+			print 'obj{}:\t\tstop falling max_y={}'.format(self.i, max_y)
 			self.falling = False
 			self.ay = 0
 			self.vy = 0
@@ -554,7 +556,7 @@ class Boy(SpriteT, Gravity):
 	def __init__(self, t, eventd, cam, svt, om):
 		SpriteT.__init__(self, t)
 		Gravity.__init__(self, om)
-		self.img = self.load_image("../img/boy2.gif")
+		self.img = self.load_image(self, "../img/boy2.gif")
 		self.eventd = eventd
 		self.fr = 0.0
 		#self.fps = 1
@@ -588,17 +590,17 @@ class Boy(SpriteT, Gravity):
 		#self.rect = pygame.Rect(self.rx, self.ry, 13, 21)
 
 	def _do_action(self, e, t):
-		print('boy{}:\t\tdoing action at t={}'.format(self.i, t))
+		print 'boy{}:\t\tdoing action at t={}'.format(self.i, t)
 		self.eventd.event(e, self, t)
 
 	def event(self, e, t, from_obj):
-		print('boy{}:\t\tnew event t={}'.format(self.i, t))
+		print 'boy{}:\t\tnew event t={}'.format(self.i, t)
 		if(from_obj != None):
-			print('boy{}:\t\tevent not for me'.format(self.i))
+			print 'boy{}:\t\tevent not for me'.format(self.i)
 			return False
 		if(self.disabled): return False
-		#print('Boy'+str(self.i)+' event '+ str(e) +' from '
-		#	+str(from_obj) + ' at ' + str(t))
+		#print 'Boy'+str(self.i)+' event '+ str(e +' from '
+		#	+str(from_obj) + ' at ' + str(t)
 
 		if e.type == pygame.KEYDOWN:
 			if e.key == pygame.K_LEFT: self.vx = -1.5/50*FPS
@@ -656,7 +658,7 @@ class Boy(SpriteT, Gravity):
 	def recalc(self, t):
 		'Actualiza la posición del chico'
 		if(self.disabled): return
-		#print('Boy update')
+		#print 'Boy update'
 		Gravity.update_velocity(self, t)
 		if self.vy < -30*FPS/50:
 			self.svt.level_event(t, EVENTCODE_DIE)
@@ -697,11 +699,11 @@ class Boy(SpriteT, Gravity):
 		#abs_pos = (self.rx, self.ry)
 		#rel_pos = self.cam.get_relative_position(self.rx, self.ry)
 		#scr_pos = self.cam.get_screen_position(self.rx, self.ry)
-		##print('Boy rect: ' + str(self.rect))
+		##print 'Boy rect: ' + str(self.rect)
 		#
-		#print('Boy absolute position ' + str(abs_pos))
-		#print('Boy relative position ' + str(rel_pos))
-		#print('Boy screen position ' + str(scr_pos))
+		#print 'Boy absolute position ' + str(abs_pos)
+		#print 'Boy relative position ' + str(rel_pos)
+		#print 'Boy screen position ' + str(scr_pos)
 
 		#self._draw_axis()
 		#
@@ -710,7 +712,7 @@ class Boy(SpriteT, Gravity):
 		##r.bottom += cy
 		#r.bottomleft = scr_pos
 		#screen.blit(self.surf, r)
-		#print("x:"+str(self.rx)+" y:"+str(self.ry))
+		#print "x:"+str(self.rx)+" y:"+str(self.ry)
 
 	def disable(self):
 		self.disabled = True
@@ -723,7 +725,7 @@ class Machine(SpriteT, BlockState):
 	def __init__(self, t, eventd, cam, svt):
 		SpriteT.__init__(self, t)
 		BlockState.__init__(self)
-		self.img = self.load_image("../img/machine.gif")
+		self.img = self.load_image(self, "../img/machine.gif")
 		self.eventd = eventd
 		self.imgx = 0
 		self.imgy = 0
@@ -756,87 +758,87 @@ class Machine(SpriteT, BlockState):
 #				self.action = 1
 
 	def event(self, e, t, from_obj):
-		#print('Machine event from ' + str(from_obj.i) + ' at ' + str(t))
+		#print 'Machine event from ' + str(from_obj.i) + ' at ' + str(t)
 		if not ((e.type == pygame.KEYDOWN) and (e.key == KEY_ACTION)):
-			print('machine{}:\tignoring unknown event key'.format(self.i))
+			print 'machine{}:\tignoring unknown event key'.format(self.i)
 			return False
 
-		print('machine{}:\tnew event t={}'.format(self.i, t))
+		print 'machine{}:\tnew event t={}'.format(self.i, t)
 
 		if self.state == MACHINE_OFF:
 			if self.blocked() == True:
-				print(str(t)+
+				print str(t+
 					':BUG, máquina bloqueada y apagada')
-				sys.exit()
+				sys.exit('BUG')
 			else:
-				print('machine{}:\tprogramming from i={} at t={}'.format(self.i,
-					from_obj.i, t))
+				print 'machine{}:\tprogramming from i={} at t={}'.format(self.i,
+					from_obj.i, t)
 				#self.block(from_obj)
 				#self.action = 1
 				self.program(t)
 		elif self.state == MACHINE_ON:
 			#if not self.blocked():
-			#	print(str(t)+
+			#	print str(t+
 			#		':ERROR, máquina desbloqueada y encendida')
 			if self.blocked():
 				if self.is_blocked_by(from_obj):
 				#	or from_obj == self.eventd.active_boy:
-					print('machine{}:\tunblocking from {}'.format(self.i, from_obj.i))
+					print 'machine{}:\tunblocking from {}'.format(self.i, from_obj.i)
 					self.unblock()
 					self.poweroff(from_obj, t)
 				elif (not self.is_blocked_by(from_obj)) and\
 					from_obj != self.eventd.active_boy:
-					#print('machine{}:\taltered past detected'.format(self.i))
-					print('machine{}:\tblocked by boy{} but not for boy{}'.format(
-						self.i, self.obj_block.i, from_obj.i))
+					#print 'machine{}:\taltered past detected'.format(self.i)
+					print 'machine{}:\tblocked by boy{} but not for boy{}'.format(
+						self.i, self.obj_block.i, from_obj.i)
 					return False
 				else:
-					print('machine{}:\tyou can not use this machine!!!'.format(self.i))
-					print('machine{}:\tonly boy{} can use me!!!'.format(
-						self.i, self.obj_block.i))
+					print 'machine{}:\tyou can not use this machine!!!'.format(self.i)
+					print 'machine{}:\tonly boy{} can use me!!!'.format(
+						self.i, self.obj_block.i)
 					return False
 			else:	#La máquina está desbloqueada, está libre
 				if from_obj != self.eventd.active_boy:
-					print('machine{}:\taltered past detected'.format(self.i))
-					print('machine{}:\tunblocked but not blocked by boy{}'.format(
-						self.i, from_obj.i))
+					print 'machine{}:\taltered past detected'.format(self.i)
+					print 'machine{}:\tunblocked but not blocked by boy{}'.format(
+						self.i, from_obj.i)
 					self.svt.level_event(t, EVENTCODE_INCOHERENCE)
 				else:
-					print('machine{}:\tpowering off by boy{}'.format(
-						self.i, from_obj.i))
+					print 'machine{}:\tpowering off by boy{}'.format(
+						self.i, from_obj.i)
 					self.poweroff(from_obj, t)
 		else: #Encendiendo
 			if from_obj != self.eventd.active_boy:
-				print('machine{}:\taltered past detected'.format(self.i))
-				print('machine{}:\talready powering on'.format(self.i))
+				print 'machine{}:\taltered past detected'.format(self.i)
+				print 'machine{}:\talready powering on'.format(self.i)
 				self.svt.level_event(t, EVENTCODE_INCOHERENCE)
 			else:
-				print('machine{}:\tyou cannot use me while powering'.format(
-					self.i))
+				print 'machine{}:\tyou cannot use me while powering'.format(
+					self.i)
 
 #			elif self.obj_block.disabled:
 #				self.unblock()
 #				self.poweroff(from_obj, t)
 #			elif from_obj != self.eventd.active_boy and \
 #				self.is_blocked_by(self.eventd.active_boy):
-#				print('machine{}:\taltered past detected'.format(self.i))
-#				sys.exit()
+#				print 'machine{}:\taltered past detected'.format(self.i)
+#				sys.exit('')
 #				return False
 #			else:
-#				print('machine{}:\tignoring event'.format(self.i))
+#				print 'machine{}:\tignoring event'.format(self.i)
 #				return False
 
 
 		return True
 
 	def program(self, t):
-		print("machine{}:\tprogramming t={}".format(self.i, t))
+		print "machine{}:\tprogramming t={}".format(self.i, t)
 		self.timer_start = t
 		self.state = MACHINE_TIMER0
 
 	def update_timer(self, t):
 		dif_t = t - self.timer_start
-		#print(dif_t)
+		#print dif_t
 		if dif_t > self.timer_time:
 			self.poweron(t)
 		else:
@@ -846,17 +848,17 @@ class Machine(SpriteT, BlockState):
 	def poweron(self, t):
 		self.state = MACHINE_ON
 		#Crear un evento de encendido
-		print("machine{}:\tpowered on at t={}".format(self.i, t))
+		print "machine{}:\tpowered on at t={}".format(self.i, t)
 		self.svt.on(self, t)
 
 	def poweroff(self, boy, t):
 		previous_state = self.state
 		self.state = MACHINE_OFF
-		print("machine{}:\tpowered off at t={}".format(self.i, t))
+		print "machine{}:\tpowered off at t={}".format(self.i, t)
 
 		if previous_state == MACHINE_ON:
 			if boy == self.eventd.active_boy:
-				print("machine{}:\ttravelling at t={}".format(self.i, t))
+				print "machine{}:\ttravelling at t={}".format(self.i, t)
 				self.svt.off(self, t)
 
 	def draw(self, t):
@@ -869,21 +871,21 @@ class Machine(SpriteT, BlockState):
 		screen.blit(self.surf, self.rect)
 
 	def update(self, t):
-		#print('Machine update')
+		#print 'Machine update'
 		#if(self.action and self.state == MACHINE_OFF):
 		#	self.action = 0
 		#	self.program(t)
 		if(self.state in (MACHINE_TIMER0, MACHINE_TIMER1)):
 			self.update_timer(t)
 		self.frame()
-		#print('Machine rect: ' + str(self.rect))
+		#print 'Machine rect: ' + str(self.rect)
 		#if self.blocked():
 		#	pygame.draw.rect(self.surf, (100,0,0), (0, 0,
 		#		self.imgw, self.imgh), 1)
 
 
-		#print('Machine screen position: ' + str(scr_pos))
-		#print('Machine absolute position: ' + str(abs_pos))
+		#print 'Machine screen position: ' + str(scr_pos)
+		#print 'Machine absolute position: ' + str(abs_pos)
 
 		#rect = pygame.Rect(self.rx + cx, self.ry + cy, self.imgw, self.imgh)
 		#r = self.rect
@@ -922,11 +924,11 @@ class MachineStart(Machine):
 
 	def event(self, e, t, from_obj):
 		if(from_obj != self):
-			print("machine{}:\tignoring all external events".format(self.i))
+			print "machine{}:\tignoring all external events".format(self.i)
 			return False
 
 		if not (e.type == pygame.USEREVENT and e.code == MACHINE_ON):
-			print("machine{}:\tignoring unknown event".format(self.i))
+			print "machine{}:\tignoring unknown event".format(self.i)
 			return False
 
 		self.svt.on(self, t)
@@ -961,18 +963,18 @@ class MachineExit:
 			self.imgh)
 
 	def event(self, e, t, from_obj):
-		#print('Machine event from ' + str(from_obj.i) + ' at ' + str(t))
+		#print 'Machine event from ' + str(from_obj.i) + ' at ' + str(t)
 		if not ((e.type == pygame.KEYDOWN) and (e.key == KEY_ACTION)):
-			print('machine{}:\tignoring unknown event key'.format(self.i))
+			print 'machine{}:\tignoring unknown event key'.format(self.i)
 			return False
 
 		if(from_obj != self.eventd.active_boy):
-			print('machine{}:\tignoring unknown boy{}'.format(
-				self.i, from_obj.i))
+			print 'machine{}:\tignoring unknown boy{}'.format(
+				self.i, from_obj.i)
 			return False
 
-		print('machine{}:\tnew event t={}'.format(self.i, t))
-		print('machine{}:\tend of level'.format(self.i))
+		print 'machine{}:\tnew event t={}'.format(self.i, t)
+		print 'machine{}:\tend of level'.format(self.i)
 
 
 		# Send event to GameLogic to start a new level
@@ -1016,13 +1018,13 @@ class EventControl:
 		return self.key_events
 
 	def dispatch(self):
-		#print('EventControl dispatched')
+		#print 'EventControl dispatched'
 		self._filter_key_events()
 		for e in self.raw_events:
 			if e.type == pygame.QUIT or\
 				(e.type == pygame.KEYDOWN and e.key == pygame.K_q):
-				print('Exiting')
-				sys.exit()
+				print 'Exiting'
+				sys.exit('')
 
 
 class EventDaemon:
@@ -1038,12 +1040,12 @@ class EventDaemon:
 		self.svt = svt
 
 	def event(self, e, obj_from, t):
-		print('eventd:\t\tnew event at t={} from i={}'.format(t,obj_from.i))
+		print 'eventd:\t\tnew event at t={} from i={}'.format(t,obj_from.i)
 		self.eventlist.append((e, obj_from, t))
 
 	def event_to(self, e, obj_from, obj_dst, t):
-		print('eventd:\t\tnew event at t={} from obj{} to obj{}'.format(
-			t, obj_from.i, obj_dst))
+		print 'eventd:\t\tnew event at t={} from obj{} to obj{}'.format(
+			t, obj_from.i, obj_dst)
 #		obj_dst.event(e, t, obj_from)
 		self.event_to_list.append((e, obj_from, obj_dst, t))
 
@@ -1056,35 +1058,32 @@ class EventDaemon:
 		if(self.active_boy == None): return
 
 		for event in self.ec.get_keyboard():
-			print('eventd:\t\tkey event. Sending at {} to active boy'.format(rel_t))
+			print 'eventd:\t\tkey event. Sending at {} to active boy'.format(rel_t)
 			self.active_boy.event(event, rel_t, None)
 			self.svt.key_event(event, rel_t)
 
 	def dispatch(self, rel_t):
-#		print('eventd:\t\tdispatch frame t={}'.format(rel_t))
+#		print 'eventd:\t\tdispatch frame t={}'.format(rel_t)
 		self.ec.dispatch()
 		self._dispatch_keyboard(rel_t)
-		copyel = self.eventlist.copy()
 		for elem in self.eventlist:
 			e = elem[0]
 			from_obj = elem[1]
 			e_t = elem[2]
 			l = self.object_manager.collide(from_obj)
 			#if l != []:
-			#	print('Lista de objetos al colisionar: ' +
-			#		str(l))
+			#	print 'Lista de objetos al colisionar: ' +
+			#		str(l)
 			for obj in l:
 				if rel_t != e_t:
-					print('eventd:\t\tBUG:Offending time {} != {}'.format(rel_t, e_t))
-					print(str(elem))
-					sys.exit()
-				print('eventd:\t\tsending event from {} at {} to {}'.format(
-					from_obj.i, rel_t, obj.i))
+					print 'eventd:\t\tBUG:Offending time {} != {}'.format(rel_t, e_t)
+					print str(elem)
+					sys.exit('')
+				print 'eventd:\t\tsending event from {} at {} to {}'.format(
+					from_obj.i, rel_t, obj.i)
 				if obj.event(e, rel_t, from_obj) == True: break
 #		if self.eventlist != []:
-#			print("eventd:\t\tno more events")
-		if(copyel != self.eventlist):
-			print("eventd:\t\teventlist alterada")
+#			print "eventd:\t\tno more events"
 		self.eventlist = []
 
 
@@ -1111,14 +1110,14 @@ class ObjectManager:
 
 	def collide(self, obj):
 		#for o in self.objects:
-		#	print(str(o.rect))
+		#	print str(o.rect)
 		return pygame.sprite.spritecollide(obj, self.objects, False)
 
 	def update(self, rel_t):
 
 		self.eventd.active_boy.recalc(rel_t)
 		for obj in self.objects+self.walls:
-			#print('Updating object: ' + str(obj))
+			#print 'Updating object: ' + str(obj)
 			if(obj != self.eventd.active_boy):
 				obj.update(rel_t)
 		#self.eventd.active_boy.update(rel_t)
@@ -1129,7 +1128,7 @@ class ObjectManager:
 		for obj in self.objects:
 			if isinstance(obj, Boy):
 				obj.disable()
-				print('om:\t\tdisable boy{}'.format(obj.i))
+				print 'om:\t\tdisable boy{}'.format(obj.i)
 
 	def restore_boy(self, d, boy):
 		for t in d['l']:
@@ -1145,7 +1144,7 @@ class ObjectManager:
 			max_y = l[0].ry
 			for o in l:
 				if o.ry > max_y: max_y = o.ry
-			#print(str(l))
+			#print str(l)
 			return max_y
 		else:
 			return None
@@ -1181,7 +1180,7 @@ class Camera:
 		self.camera = (0, 0)
 
 	def follow(self, obj):
-		print('camera:\t\tnow following boy{}'.format(obj.i))
+		print 'camera:\t\tnow following boy{}'.format(obj.i)
 		self.obj = obj
 
 	def update(self):
@@ -1195,15 +1194,15 @@ class Camera:
 		rx = self.obj.rx
 		ry = self.obj.ry
 
-		#print('Camera obj position '+str((self.obj.rx, self.obj.ry)))
-		#print('Camera obj relative to '+str(self.obj_coord))
-		#print('Camera screen center '+str((wm, hm)))
+		#print 'Camera obj position '+str((self.obj.rx, self.obj.ry))
+		#print 'Camera obj relative to '+str(self.obj_coord)
+		#print 'Camera screen center '+str((wm, hm))
 		cx = wm - rx - wb/2
 		cy = hm - 0 * ry - hb/2
 
 		self.camera = (int(cx), int(cy))
-		#print('camera:\t\tupdate')
-		#print('Camera update '+str(self.camera))
+		#print 'camera:\t\tupdate'
+		#print 'Camera update '+str(self.camera)
 
 
 	def get_relative_position(self, rx, ry):
@@ -1226,7 +1225,7 @@ class SceneStart(Scene):
 		Scene.__init__(self, ec)
 		self.logic = logic
 		self.img = SpriteT.load_image(self, "../img/title.png")
-		print('SceneStart')
+		print 'SceneStart'
 
 	def update(self):
 		screen.fill((0, 0, 0))
@@ -1245,7 +1244,7 @@ class SceneControls(Scene):
 		Scene.__init__(self, ec)
 		self.logic = logic
 		self.img = SpriteT.load_image(self, "../img/controls.png")
-		print('SceneControls')
+		print 'SceneControls'
 
 	def update(self):
 		screen.fill((0, 0, 0))
@@ -1265,7 +1264,7 @@ class SceneFailure(Scene):
 		Scene.__init__(self, ec)
 		self.logic = logic
 		self.text = text
-		print('SceneFailure:' + self.text)
+		print 'SceneFailure:' + self.text
 
 	def update(self):
 		w, h = screen.get_size()
@@ -1308,25 +1307,25 @@ class Level(Scene):
 		self.frame += 1
 
 	def event(self, e, rel_t, from_obj):
-		print('level:\t\tevent from obj{}'.format(from_obj.i))
+		print 'level:\t\tevent from obj{}'.format(from_obj.i)
 
 		if e.type != pygame.USEREVENT:
-			print('level1:\t\tignoring no user event')
+			print 'level1:\t\tignoring no user event'
 			return False
 
 		#Receive exit event from MachineExit
 		if(e.code == EVENTCODE_OFF):
-			print('level1:\t\tevent off received: level complete')
+			print 'level1:\t\tevent off received: level complete'
 			self.logic.next_level()
 			return True
 		elif(e.code == EVENTCODE_DIE):
-			print('level1:\t\tevent die received, restarting level')
+			print 'level1:\t\tevent die received, restarting level'
 			self.logic.restart_level('Has muerto.')
 		elif(e.code == EVENTCODE_COLLIDE):
-			print('level1:\t\tevent collide received, restarting level')
+			print 'level1:\t\tevent collide received, restarting level'
 			self.logic.restart_level('Has colisionado con tu clon.')
 		elif(e.code == EVENTCODE_INCOHERENCE):
-			print('level1:\t\tevent incoherence received, restarting level')
+			print 'level1:\t\tevent incoherence received, restarting level'
 			self.logic.restart_level('Has alterado el pasado.')
 
 		# End level, and go to the next.
@@ -1686,15 +1685,15 @@ class GameLogic:
 	def next_level(self):
 		'Replace actual level by the next one'
 
-		print('GameLogic next_level() called')
+		print 'GameLogic next_level() called'
 
 		self.levelnum += 1
 
 		if(self.levelnum >= len(self.levels)):
-			print('End of game!!')
-			sys.exit()
+			print 'End of game!!'
+			sys.exit('')
 
-		print('GameLogic starting level {}', self.levelnum+1)
+		print 'GameLogic starting level {}', self.levelnum+1
 
 		self.init_level()
 
@@ -1737,8 +1736,8 @@ class SVT:
 
 	def travel(self, time_now, time_past):
 		'Viaja al pasado en el tiempo'
-		print('svt:\t\ttraveling {} <--------------------- {}'.format(
-			time_past, time_now))
+		print 'svt:\t\ttraveling {} <--------------------- {}'.format(
+			time_past, time_now)
 		self.inc_t += time_now - time_past
 
 
@@ -1767,8 +1766,8 @@ class SVT:
 		for t in self.recordlist:
 			if t[0] == boy:
 				if entry != None:
-					print('svt:\t\tBUG:multiple records')
-					sys.exit()
+					print 'svt:\t\tBUG:multiple records'
+					sys.exit('BUG')
 				entry = t
 
 		return entry
@@ -1790,19 +1789,19 @@ class SVT:
 #		self.clones = []
 
 	def on(self, machine, rel_t):
-		print('svt:\t\tcloning world, by machine{} powered on at t={}'.format(
-			machine.i, rel_t))
+		print 'svt:\t\tcloning world, by machine{} powered on at t={}'.format(
+			machine.i, rel_t)
 		clone = self.om.clone()
 		boy_clone = self.eventd.active_boy.clone()
 		abs_t = rel_t + self.inc_t
 		item = (machine, clone, rel_t, boy_clone, abs_t)
 		self.clonelist.append(item)
-		#print('Lista de clones ' + str(self.clonelist))
+		#print 'Lista de clones ' + str(self.clonelist)
 
 	def rec_play(self, rel_t):
 		'Pone todas las grabaciones a reproducirse en rel_t'
-		print('svt:\t\tall recording started at t={}'.format(
-			rel_t))
+		print 'svt:\t\tall recording started at t={}'.format(
+			rel_t)
 		for t in self.recordlist:
 			t[1].play(rel_t)
 
@@ -1834,8 +1833,8 @@ class SVT:
 
 		self.om.disable_boys()
 
-		print('svt:\t\trestoring previous clone')
-		#print(str(tm[1]))
+		print 'svt:\t\trestoring previous clone'
+		#print str(tm[1])
 		self.om.restore(tm[1])
 
 		#TODO: Por que hace falta actualizar ahora?
@@ -1844,12 +1843,12 @@ class SVT:
 
 		self.rec_play(start)
 
-		#print('Lista de grabaciones ' + str(self.recordlist))
+		#print 'Lista de grabaciones ' + str(self.recordlist)
 
-		#print('Velocidad de boy al restaurarlo: ' +
-		#	str((oldboy.vx, oldboy.vy)))
+		#print 'Velocidad de boy al restaurarlo: ' +
+		#	str((oldboy.vx, oldboy.vy))
 
-		#print('Rel_t ' + str(rel_t) + ' restaurando ' + str(tm[1]))
+		#print 'Rel_t ' + str(rel_t) + ' restaurando ' + str(tm[1])
 
 		b = Boy(start, self.eventd, self.cam, self, self.om)
 		# TODO: Ajustar esta posicion para que quede en el centro
@@ -1862,7 +1861,7 @@ class SVT:
 		new_entry = self.find_boy(b)
 		newrec = new_entry[1]
 		#Bloquear la máquina al restaurarla.
-		print('svt:\t\tadding machine{} to blocklist'.format(machine.i))
+		print 'svt:\t\tadding machine{} to blocklist'.format(machine.i)
 		self.blocklist.append((machine, newrec, oldrec))
 
 		# Y bloquearla de inmediato, ya que rec no avisará, pues ya ha
@@ -1876,10 +1875,10 @@ class SVT:
 		rec = Recording(rel_t, self)
 		rec.i = boy.i
 		boy_clone = boy.clone()
-		print('svt:\t\tcloning boy{}'.format(boy.i))
-		#print(str(boy_clone))
+		print 'svt:\t\tcloning boy{}'.format(boy.i)
+		#print str(boy_clone)
 		self.recordlist.append((boy, rec, boy_clone))
-		#print(self.recordlist)
+		#print self.recordlist
 
 	def update(self, abs_t):
 		'Actualiza todo el juego usando el tiempo absoluto'
@@ -1894,15 +1893,15 @@ class SVT:
 	def dispatch(self, rel_t):
 		'Envía los eventos de las grabaciones a los personajes'
 
-		#print(str(rel_t)+':Enviando eventos grabados a los personajes')
+		#print str(rel_t)+':Enviando eventos grabados a los personajes'
 		for tup in self.recordlist:
 			eventl = tup[1].get(rel_t)
-			#print(eventl)
+			#print eventl
 			for ev in eventl:
 				boy = tup[0]
-				print('svt:\t\tsending recorded event to boy{}'.format(boy.i))
+				print 'svt:\t\tsending recorded event to boy{}'.format(boy.i)
 				boy.event(ev, rel_t, None)
-				#print(str(rel_t)+':Enviado a boy'+str(tup[0].i))
+				#print str(rel_t)+':Enviado a boy'+str(tup[0].i)
 
 	def key_event(self, e, rel_t):
 		'Envía los eventos del teclado a las grabaciones'
@@ -1919,7 +1918,7 @@ class SVT:
 		# TODO: Ya había sido desbloqueada por la propia máquina?
 		block = self.find_block_by_end_rec(rec)
 		machine = block[0]
-		print('svt:\t\tunblocking machine{}'.format(machine.i))
+		print 'svt:\t\tunblocking machine{}'.format(machine.i)
 		machine.unblock()
 
 	def find_block_by_start_rec(self, rec):
@@ -1935,7 +1934,7 @@ class SVT:
 		return None
 
 	def print_blocklist(self):
-		print('svt:\t\tblocklist:')
+		print 'svt:\t\tblocklist:'
 		for t in self.blocklist:
 			machine = t[0]
 			start_rec = t[1]
@@ -1944,24 +1943,24 @@ class SVT:
 			end_entry = self.find_rec(end_rec)
 			start_boy = start_entry[0]
 			end_boy = end_entry[0]
-			print('\tmachine{}, start rec{} boy{}, end rec{} boy{}'.format(
+			print '\tmachine{}, start rec{} boy{}, end rec{} boy{}'.format(
 				machine.i, start_rec.i, start_boy.i,
-				end_rec.i, end_boy.i))
+				end_rec.i, end_boy.i)
 
 	def block_machine(self, rec):
 		# Bloquear la máquina
-		print('svt:\t\tblock_machine')
+		print 'svt:\t\tblock_machine'
 		self.print_blocklist()
 		block = self.find_block_by_start_rec(rec)
 		if(block == None):
-			print('svt:\t\tno need to block machine for rec{}'.format(rec.i))
+			print 'svt:\t\tno need to block machine for rec{}'.format(rec.i)
 			return
 
 		machine = block[0]
 		end_rec = block[2]
 		end_entry = self.find_rec(end_rec)
 		block_boy = end_entry[0]
-		print('svt:\t\tblocking machine{} by boy{}'.format(machine.i, block_boy.i))
+		print 'svt:\t\tblocking machine{} by boy{}'.format(machine.i, block_boy.i)
 		machine.block(block_boy)
 
 	def start_record(self, rec):
@@ -1969,11 +1968,11 @@ class SVT:
 		tup = self.find_rec(rec)
 		boy = tup[0]
 		boy_clone = tup[2]
-		print('svt:\t\tstarting previous recording of boy{}'.format(boy.i))
-		print('svt:\t\trestoring previous clone of boy{}'.format(boy.i))
-		print(str(boy_clone))
+		print 'svt:\t\tstarting previous recording of boy{}'.format(boy.i)
+		print 'svt:\t\trestoring previous clone of boy{}'.format(boy.i)
+		print str(boy_clone)
 
-		print('svt:\t\tstarting recording for boy{}'.format(boy.i))
+		print 'svt:\t\tstarting recording for boy{}'.format(boy.i)
 		boy.enable()
 		boy.restore(boy_clone)
 
@@ -1981,7 +1980,7 @@ class SVT:
 		self.block_machine(rec)
 
 	def level_event(self, rel_t, code):
-		print('svt:\t\tsending event code = {} to level'.format(code))
+		print 'svt:\t\tsending event code = {} to level'.format(code)
 
 		d = {}
 		d['code'] = code
@@ -1996,8 +1995,8 @@ class SVT:
 #		clone_entry = self.find_last_clone()
 #		# Al menos ha de existir la primera clonación hecha por MachineStart
 #		if clone_entry == None:
-#			print('svt:\t\tno clones found. BUG')
-#			sys.exit()
+#			print 'svt:\t\tno clones found. BUG'
+#			sys.exit('BUG')
 #
 #		tm = clone_entry
 #		tb = rec_entry
@@ -2011,8 +2010,8 @@ class SVT:
 #
 #		self.om.disable_boys()
 #
-#		print('svt:\t\trestoring previous clone')
-#		#print(str(tm[1]))
+#		print 'svt:\t\trestoring previous clone'
+#		#print str(tm[1])
 #		self.om.restore(tm[1])
 #
 #		self.rec_play(start)
@@ -2106,7 +2105,7 @@ class SVT:
 #		self.level1(t, eventd, camera, om, svt)
 #
 #		while True:
-#			#print("-- Loop start --")
+#			#print "-- Loop start --"
 #
 #			#t = time.perf_counter()
 #			t = frame
@@ -2118,7 +2117,7 @@ class SVT:
 #			pygame.display.update()
 #			pygame.display.flip()
 #
-#			#print("-- Loop end --")
+#			#print "-- Loop end --"
 #
 #			clock.tick(50)
 #			frame += 1
