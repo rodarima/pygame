@@ -1,3 +1,7 @@
+#
+# Copyright (c) 2015 Rodrigo Arias
+# Distributed under the GNU GPL v3. For full terms see the file LICENSE.
+#
 
 # Encoding: utf-8
 
@@ -1630,11 +1634,11 @@ class Level5(Level):
 		lb0.set_target(ps0)
 		self.om.add(lb0)
 
-		lb1 = LeverButton((265, 0), self.eventd, self.camera, self.svt, self.om)
+		lb1 = LeverButton((270, 0), self.eventd, self.camera, self.svt, self.om)
 		lb1.set_target(ps1)
 		self.om.add(lb1)
 
-		lb2 = LeverButton((280, 0), self.eventd, self.camera, self.svt, self.om)
+		lb2 = LeverButton((290, 0), self.eventd, self.camera, self.svt, self.om)
 		lb2.set_target(ps2)
 		self.om.add(lb2)
 
